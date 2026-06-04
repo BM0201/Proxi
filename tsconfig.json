@@ -1,0 +1,5 @@
+{
+  "extends": "@proxi/tsconfig/base.json",
+  "files": [],
+  "references": []
+}

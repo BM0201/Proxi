@@ -1,0 +1,28 @@
+{
+  "name": "@proxi/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@proxi/eslint-config": "workspace:*",
+    "@proxi/tsconfig": "workspace:*",
+    "typescript": "^5.6.3",
+    "eslint": "^8.57.1"
+  }
+}
