@@ -1,8 +1,8 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
-const TOKEN_KEY = 'proxi:proveedor:accessToken';
+const TOKEN_KEY = 'proxi:admin:accessToken';
 
-/** Rol esperado para esta aplicación (frontend de proveedores independientes). */
-export const EXPECTED_ROLE = 'PROVIDER';
+/** Roles permitidos en el panel de administración. */
+export const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'] as const;
 
 export interface CurrentUser {
   id: string;
@@ -12,36 +12,36 @@ export interface CurrentUser {
   displayName: string;
 }
 
-export function getProveedorToken() {
+export function getAdminToken() {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem(TOKEN_KEY);
 }
 
-export function setProveedorToken(token: string) {
+export function setAdminToken(token: string) {
   window.localStorage.setItem(TOKEN_KEY, token);
 }
 
 /** Elimina el token de sesión del almacenamiento local. */
-export function clearProveedorToken() {
+export function clearAdminToken() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
 /** Indica si hay un token de sesión presente. */
 export function isAuthenticated() {
-  return Boolean(getProveedorToken());
+  return Boolean(getAdminToken());
 }
 
 /** Cierra la sesión: limpia el token y redirige a /login. */
 export function logout() {
-  clearProveedorToken();
+  clearAdminToken();
   if (typeof window !== 'undefined') {
     window.location.href = '/login';
   }
 }
 
-export async function proveedorApi<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getProveedorToken();
+export async function adminApi<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getAdminToken();
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -53,7 +53,7 @@ export async function proveedorApi<T>(path: string, options: RequestInit = {}): 
   });
 
   if (response.status === 401) {
-    clearProveedorToken();
+    clearAdminToken();
   }
 
   if (!response.ok) {
@@ -64,19 +64,13 @@ export async function proveedorApi<T>(path: string, options: RequestInit = {}): 
   return response.json() as Promise<T>;
 }
 
-/** Sube un archivo real al backend (multipart) y devuelve la metadata del MediaFile. */
-export async function uploadMedia(file: File, purpose: string) {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('purpose', purpose);
-  return proveedorApi<{ id: string; originalName: string; mimeType: string; sizeBytes: number; status: string }>(
-    '/media/upload',
-    { method: 'POST', body: formData },
-  );
-}
-
 /** Obtiene el usuario autenticado actual desde /auth/me. */
 export async function getCurrentUser(): Promise<CurrentUser> {
-  const data = await proveedorApi<{ user: CurrentUser }>('/auth/me');
+  const data = await adminApi<{ user: CurrentUser }>('/auth/me');
   return data.user;
+}
+
+/** Devuelve true si el rol corresponde a un administrador. */
+export function isAdminRole(role: string) {
+  return (ADMIN_ROLES as readonly string[]).includes(role);
 }
