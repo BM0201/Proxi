@@ -45,8 +45,17 @@ Después:
 ```powershell
 pnpm db:generate
 pnpm db:migrate
+pnpm db:seed
 pnpm dev:api
 ```
+
+### Credenciales del seed
+
+- Admin: `admin@proxi.local` / `ProxiAdmin123!`
+- Cliente: `cliente@proxi.local` / `ProxiCliente123!`
+- Proveedor: `proveedor@proxi.local` / `ProxiProveedor123!`
+
+> Guía ampliada de este sprint en [`next-functional-level.md`](./next-functional-level.md).
 
 ## Orden recomendado para probar flujo real
 
