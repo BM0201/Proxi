@@ -1,32 +1,57 @@
-import { paymentsMock, tasksMock } from '@proxi/contracts';
-import { Badge, Card, CardContent, PageHeader, SimpleTable, StatCard, StatusPill } from '@proxi/ui';
+'use client';
 
-const alertRows = [
-  ['Verificaciones', <StatusPill key="status" status="warning" label="5 pendientes" />, <Badge key="badge" variant="warning">Identidad</Badge>],
-  ['Alertas anti-fuga', <StatusPill key="status" status="danger" label="3 alertas" />, <Badge key="badge" variant="danger">Mensajes</Badge>],
-  ['Pagos protegidos', <StatusPill key="status" status="success" label="1 protegido" />, <Badge key="badge" variant="success">Mock</Badge>],
-];
+import { useEffect, useState } from 'react';
+import { Card, CardContent, PageHeader, StatCard } from '@proxi/ui';
+import { adminApi } from '../../lib/api';
+
+interface Overview {
+  users: number;
+  providers: number;
+  tasks: number;
+  bookings: number;
+  openFlags: number;
+  pendingVerifications: number;
+  protectedPayments: number;
+}
 
 export default function AdminDashboardPage() {
+  const [data, setData] = useState<Overview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminApi<Overview>('/admin/overview')
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Error al cargar'));
+  }, []);
+
   return (
     <main style={{ maxWidth: 1120, margin: '0 auto', display: 'grid', gap: 18 }}>
       <PageHeader
         title="Dashboard"
-        description="Control visual del flujo inicial: tareas, ofertas, pagos protegidos, reclamos y proveedores."
+        description="Métricas reales del backend: usuarios, proveedores, tareas, reservas, pagos protegidos y moderación."
       />
-      <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
-        <StatCard label="Tareas publicadas" value={tasksMock.length} description="Mock del flujo cliente." />
-        <StatCard label="Ofertas enviadas" value="3" description="Comparación de proveedores." />
-        <StatCard label="Pagos protegidos" value={paymentsMock.length} description="Sin pagos reales." />
-        <StatCard label="Reclamos abiertos" value="1" description="Evidencia pendiente." />
-        <StatCard label="Proveedores pendientes" value="5" description="Verificación manual." />
-        <StatCard label="Alertas anti-fuga" value="3" description="Mensajes marcados." />
-      </div>
-      <Card>
-        <CardContent style={{ paddingTop: '1.25rem' }}>
-          <SimpleTable headers={['Área', 'Estado', 'Tipo']} rows={alertRows} />
-        </CardContent>
-      </Card>
+      {error ? <p style={{ color: '#b91c1c' }}>{error}</p> : null}
+      {!data && !error ? <p style={{ color: '#6d6877' }}>Cargando métricas…</p> : null}
+      {data ? (
+        <>
+          <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
+            <StatCard label="Usuarios" value={data.users} description="Cuentas registradas." />
+            <StatCard label="Proveedores" value={data.providers} description="Perfiles de proveedor." />
+            <StatCard label="Tareas" value={data.tasks} description="Tareas publicadas." />
+            <StatCard label="Reservas" value={data.bookings} description="Reservas creadas." />
+            <StatCard label="Pagos protegidos" value={data.protectedPayments} description="Saldo retenido (sandbox)." />
+            <StatCard label="Verificaciones pendientes" value={data.pendingVerifications} description="Por revisar." />
+            <StatCard label="Alertas anti-fuga" value={data.openFlags} description="Flags de moderación abiertos." />
+          </div>
+          <Card>
+            <CardContent style={{ paddingTop: '1.25rem' }}>
+              <p style={{ margin: 0, color: '#6d6877' }}>
+                Datos en vivo desde <code>/api/admin/overview</code>. Los pagos son sandbox (sin dinero real).
+              </p>
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </main>
   );
 }
