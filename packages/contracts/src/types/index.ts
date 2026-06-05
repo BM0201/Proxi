@@ -6,11 +6,17 @@
  */
 import type {
   UserRole,
-  ProviderStatus,
+  UserStatus,
+  ProviderLevel,
+  ProviderVerificationStatus,
   TaskStatus,
   OfferStatus,
   BookingStatus,
   PaymentStatus,
+  LocationVisibility,
+  ProtectedPaymentStatus,
+  PricingType,
+  VerificationStatus,
 } from '../enums';
 
 /** Identificador único (CUID/UUID) usado en toda la plataforma. */
@@ -43,6 +49,7 @@ export interface PublicUser {
   id: Id;
   email: string;
   role: UserRole;
+  status: UserStatus;
   displayName: string | null;
   createdAt: string;
 }
@@ -51,10 +58,11 @@ export interface PublicUser {
 export interface PublicProviderProfile {
   id: Id;
   userId: Id;
-  status: ProviderStatus;
+  verificationStatus: ProviderVerificationStatus;
+  level: ProviderLevel;
   bio: string | null;
-  hourlyRate: number | null;
   ratingAverage: number | null;
+  completedJobs: number;
 }
 
 /** Vista de una tarea publicada. */
@@ -109,4 +117,125 @@ export interface JwtPayload {
   sub: Id;
   email: string;
   role: UserRole;
+}
+
+export interface CurrentUserDto {
+  id: Id;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  displayName: string | null;
+}
+
+export interface LocationView {
+  id: Id;
+  label: string;
+  country: string;
+  department: string;
+  city: string;
+  zone: string;
+  addressLine1?: string;
+  addressLine2?: string | null;
+  latitude?: number;
+  longitude?: number;
+  visibility: LocationVisibility;
+  isExact: boolean;
+}
+
+export interface MockLocation {
+  department: string;
+  city: string;
+  zone: string;
+  reference: string;
+  latitude: number;
+  longitude: number;
+  visibility: LocationVisibility;
+}
+
+export interface MockReview {
+  id: Id;
+  providerId: Id;
+  authorName: string;
+  rating: number;
+  comment: string;
+  taskTitle: string;
+  createdAt: string;
+}
+
+export interface MockProvider {
+  id: Id;
+  name: string;
+  avatarUrl: string;
+  trade: string;
+  level: ProviderLevel;
+  rating: number;
+  reviewCount: number;
+  completedJobs: number;
+  punctuality: string;
+  verificationStatus: VerificationStatus;
+  certifications: string[];
+  services: string[];
+  baseRate: string;
+  minimumVisit: string;
+  tools: string[];
+  vehicle: string;
+  portfolioPhotos: string[];
+}
+
+export interface MockTask {
+  id: Id;
+  clientName: string;
+  title: string;
+  category: string;
+  description: string;
+  shortDescription: string;
+  status: TaskStatus;
+  budgetMin: number;
+  budgetMax: number;
+  pricingType: PricingType;
+  offerCount: number;
+  dateLabel: string;
+  location: MockLocation;
+  photos: string[];
+  createdAt: string;
+}
+
+export interface MockOffer {
+  id: Id;
+  taskId: Id;
+  providerId: Id;
+  status: OfferStatus;
+  price: number;
+  estimatedTime: string;
+  availability: string;
+  message: string;
+  includesMaterials: boolean;
+  requiresTechnicalVisit: boolean;
+  conditions: string;
+  createdAt: string;
+}
+
+export interface MockBooking {
+  id: Id;
+  taskId: Id;
+  offerId: Id;
+  clientName: string;
+  providerId: Id;
+  status: BookingStatus;
+  protectedPaymentStatus: ProtectedPaymentStatus;
+  dateLabel: string;
+  zone: string;
+}
+
+export interface MockProtectedPayment {
+  id: Id;
+  bookingId: Id;
+  taskId: Id;
+  offerId: Id;
+  amount: number;
+  proxiFeePercent: number;
+  proxiFeeAmount: number;
+  totalAmount: number;
+  status: ProtectedPaymentStatus;
+  createdAt: string;
 }

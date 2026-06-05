@@ -1,58 +1,100 @@
-/**
- * Enums compartidos de la plataforma Proxi.
- *
- * Estos valores deben mantenerse sincronizados con los enums definidos en
- * el schema de Prisma (`@proxi/database`). Se usan como contrato único entre
- * el backend (NestJS) y las aplicaciones web (Next.js).
- */
-
-/** Rol del usuario dentro de la plataforma. */
 export enum UserRole {
-  /** Cliente que publica tareas y contrata servicios. */
   CLIENT = 'CLIENT',
-  /** Proveedor independiente que ofrece servicios. */
   PROVIDER = 'PROVIDER',
-  /** Administrador de la plataforma. */
   ADMIN = 'ADMIN',
+  SUPER_ADMIN = 'SUPER_ADMIN',
 }
 
-/** Estado de verificación de un proveedor independiente. */
-export enum ProviderStatus {
-  PENDING = 'PENDING',
-  VERIFIED = 'VERIFIED',
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  PENDING_EMAIL_VERIFICATION = 'PENDING_EMAIL_VERIFICATION',
   SUSPENDED = 'SUSPENDED',
+  BANNED = 'BANNED',
+}
+
+export enum ProviderLevel {
+  LEVEL_0 = 'LEVEL_0',
+  LEVEL_1 = 'LEVEL_1',
+  LEVEL_2 = 'LEVEL_2',
+  LEVEL_3 = 'LEVEL_3',
+  LEVEL_4_PRO = 'LEVEL_4_PRO',
+  LEVEL_5_PREMIUM = 'LEVEL_5_PREMIUM',
+}
+
+export enum ProviderVerificationStatus {
+  NOT_STARTED = 'NOT_STARTED',
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  NEEDS_CORRECTION = 'NEEDS_CORRECTION',
+}
+
+export enum VerificationStatus {
+  NOT_STARTED = 'NOT_STARTED',
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  NEEDS_CORRECTION = 'NEEDS_CORRECTION',
+}
+
+export enum CertificationStatus {
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
 }
 
-/** Estado del ciclo de vida de una tarea publicada por un cliente. */
 export enum TaskStatus {
   DRAFT = 'DRAFT',
   PUBLISHED = 'PUBLISHED',
   RECEIVING_OFFERS = 'RECEIVING_OFFERS',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
-}
-
-/** Estado de una oferta enviada por un proveedor a una tarea. */
-export enum OfferStatus {
-  PENDING = 'PENDING',
-  ACCEPTED = 'ACCEPTED',
-  REJECTED = 'REJECTED',
-  WITHDRAWN = 'WITHDRAWN',
-}
-
-/** Estado de una reserva (pago protegido) entre cliente y proveedor. */
-export enum BookingStatus {
-  PENDING_PAYMENT = 'PENDING_PAYMENT',
-  PAID = 'PAID',
+  OFFER_ACCEPTED = 'OFFER_ACCEPTED',
+  PROTECTED_PAYMENT_CONFIRMED = 'PROTECTED_PAYMENT_CONFIRMED',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
   DISPUTED = 'DISPUTED',
 }
 
-/** Estado de un pago realizado por el cliente. */
+export enum OfferStatus {
+  SENT = 'SENT',
+  VIEWED = 'VIEWED',
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  REJECTED = 'REJECTED',
+  COUNTERED = 'COUNTERED',
+  EXPIRED = 'EXPIRED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
+export enum BookingStatus {
+  CONFIRMED = 'CONFIRMED',
+  PENDING_PAYMENT = 'PENDING_PAYMENT',
+  PAID = 'PAID',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED_BY_PROVIDER = 'COMPLETED_BY_PROVIDER',
+  CONFIRMED_BY_CLIENT = 'CONFIRMED_BY_CLIENT',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  DISPUTED = 'DISPUTED',
+}
+
+export enum ProtectedPaymentStatus {
+  NOT_STARTED = 'NOT_STARTED',
+  PENDING = 'PENDING',
+  PROTECTED = 'PROTECTED',
+  APPROVED_FOR_PAYOUT = 'APPROVED_FOR_PAYOUT',
+  DISPUTED = 'DISPUTED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum PricingType {
+  FIXED = 'FIXED',
+  HOURLY = 'HOURLY',
+  DAILY = 'DAILY',
+  TECHNICAL_VISIT = 'TECHNICAL_VISIT',
+  OPEN_TO_OFFERS = 'OPEN_TO_OFFERS',
+}
+
 export enum PaymentStatus {
   PENDING = 'PENDING',
   PROCESSING = 'PROCESSING',
@@ -61,7 +103,6 @@ export enum PaymentStatus {
   REFUNDED = 'REFUNDED',
 }
 
-/** Estado de una liquidación (payout) hacia el proveedor. */
 export enum PayoutStatus {
   PENDING = 'PENDING',
   PROCESSING = 'PROCESSING',
@@ -69,7 +110,6 @@ export enum PayoutStatus {
   FAILED = 'FAILED',
 }
 
-/** Estado de una disputa abierta sobre una reserva. */
 export enum DisputeStatus {
   OPEN = 'OPEN',
   UNDER_REVIEW = 'UNDER_REVIEW',
@@ -77,19 +117,13 @@ export enum DisputeStatus {
   CLOSED = 'CLOSED',
 }
 
-/** Tipo de movimiento en el libro mayor (ledger) de saldos. */
 export enum LedgerEntryType {
-  /** Crédito: ingreso de saldo a la cuenta. */
   CREDIT = 'CREDIT',
-  /** Débito: salida de saldo de la cuenta. */
   DEBIT = 'DEBIT',
-  /** Reserva de saldo (pago protegido pendiente de liquidación). */
   HOLD = 'HOLD',
-  /** Liberación de saldo reservado hacia saldo aprobado. */
   RELEASE = 'RELEASE',
 }
 
-/** Tipo de entidad reportada en una marca de moderación. */
 export enum ModerationEntityType {
   TASK = 'TASK',
   OFFER = 'OFFER',
@@ -98,7 +132,6 @@ export enum ModerationEntityType {
   PROVIDER_PROFILE = 'PROVIDER_PROFILE',
 }
 
-/** Estado de una marca de moderación. */
 export enum ModerationStatus {
   OPEN = 'OPEN',
   REVIEWED = 'REVIEWED',
@@ -106,14 +139,31 @@ export enum ModerationStatus {
   DISMISSED = 'DISMISSED',
 }
 
-/** Tipo de archivo multimedia. */
-export enum MediaType {
-  IMAGE = 'IMAGE',
-  VIDEO = 'VIDEO',
-  DOCUMENT = 'DOCUMENT',
+export enum MediaPurpose {
+  AVATAR = 'AVATAR',
+  PROVIDER_PORTFOLIO = 'PROVIDER_PORTFOLIO',
+  VERIFICATION_DOCUMENT = 'VERIFICATION_DOCUMENT',
+  VERIFICATION_SELFIE = 'VERIFICATION_SELFIE',
+  TASK_PHOTO = 'TASK_PHOTO',
+  TASK_VIDEO = 'TASK_VIDEO',
+  BOOKING_EVIDENCE = 'BOOKING_EVIDENCE',
+  DISPUTE_EVIDENCE = 'DISPUTE_EVIDENCE',
 }
 
-/** Tipo de notificación enviada a un usuario. */
+export enum MediaStatus {
+  UPLOADED = 'UPLOADED',
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  DELETED = 'DELETED',
+}
+
+export enum LocationVisibility {
+  PRIVATE = 'PRIVATE',
+  APPROXIMATE = 'APPROXIMATE',
+  BOOKING_ONLY = 'BOOKING_ONLY',
+}
+
 export enum NotificationType {
   TASK_UPDATE = 'TASK_UPDATE',
   OFFER_RECEIVED = 'OFFER_RECEIVED',

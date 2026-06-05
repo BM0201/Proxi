@@ -25,12 +25,36 @@ enum UserRole {
   CLIENT
   PROVIDER
   ADMIN
+  SUPER_ADMIN
 }
 
-enum ProviderStatus {
-  PENDING
-  VERIFIED
+enum UserStatus {
+  ACTIVE
+  PENDING_EMAIL_VERIFICATION
   SUSPENDED
+  BANNED
+}
+
+enum ProviderLevel {
+  LEVEL_0
+  LEVEL_1
+  LEVEL_2
+  LEVEL_3
+  LEVEL_4_PRO
+  LEVEL_5_PREMIUM
+}
+
+enum ProviderVerificationStatus {
+  NOT_STARTED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  NEEDS_CORRECTION
+}
+
+enum CertificationStatus {
+  PENDING_REVIEW
+  APPROVED
   REJECTED
 }
 
@@ -38,25 +62,52 @@ enum TaskStatus {
   DRAFT
   PUBLISHED
   RECEIVING_OFFERS
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum OfferStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  WITHDRAWN
-}
-
-enum BookingStatus {
-  PENDING_PAYMENT
-  PAID
+  OFFER_ACCEPTED
+  PROTECTED_PAYMENT_CONFIRMED
   IN_PROGRESS
   COMPLETED
   CANCELLED
   DISPUTED
+}
+
+enum OfferStatus {
+  SENT
+  VIEWED
+  PENDING
+  ACCEPTED
+  REJECTED
+  COUNTERED
+  EXPIRED
+  WITHDRAWN
+}
+
+enum BookingStatus {
+  CONFIRMED
+  PENDING_PAYMENT
+  PAID
+  IN_PROGRESS
+  COMPLETED_BY_PROVIDER
+  CONFIRMED_BY_CLIENT
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum ProtectedPaymentStatus {
+  NOT_STARTED
+  PENDING
+  PROTECTED
+  APPROVED_FOR_PAYOUT
+  DISPUTED
+  REFUNDED
+}
+
+enum PricingType {
+  FIXED
+  HOURLY
+  DAILY
+  TECHNICAL_VISIT
+  OPEN_TO_OFFERS
 }
 
 enum PaymentStatus {
@@ -109,6 +160,31 @@ enum MediaType {
   DOCUMENT
 }
 
+enum MediaPurpose {
+  AVATAR
+  PROVIDER_PORTFOLIO
+  VERIFICATION_DOCUMENT
+  VERIFICATION_SELFIE
+  TASK_PHOTO
+  TASK_VIDEO
+  BOOKING_EVIDENCE
+  DISPUTE_EVIDENCE
+}
+
+enum MediaStatus {
+  UPLOADED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  DELETED
+}
+
+enum LocationVisibility {
+  PRIVATE
+  APPROXIMATE
+  BOOKING_ONLY
+}
+
 enum NotificationType {
   TASK_UPDATE
   OFFER_RECEIVED
@@ -126,15 +202,15 @@ enum NotificationType {
 
 /// Usuario base de la plataforma. Puede ser cliente, proveedor o administrador.
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  hashedPassword String
-  role           UserRole @default(CLIENT)
-  displayName    String?
-  isActive       Boolean  @default(true)
-  emailVerified  Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String
+  role            UserRole   @default(CLIENT)
+  status          UserStatus @default(PENDING_EMAIL_VERIFICATION)
+  displayName     String?
+  emailVerifiedAt DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   clientProfile   ClientProfile?
   providerProfile ProviderProfile?
@@ -150,43 +226,52 @@ model User {
   disputes         Dispute[]        @relation("DisputeInitiator")
   chatMessages     ChatMessage[]
   moderationFlags  ModerationFlag[]
-  mediaFiles       MediaFile[]
+  mediaFiles       MediaFile[]      @relation("MediaOwner")
   notifications    Notification[]
   auditLogs        AuditLog[]
+  locations        Location[]
+  reviewedProviderVerifications ProviderVerification[] @relation("ProviderVerificationReviewer")
+  reviewedProviderCertifications ProviderCertification[] @relation("ProviderCertificationReviewer")
 
   @@index([role])
+  @@index([status])
 }
 
 /// Perfil de cliente: datos adicionales del usuario que contrata servicios.
 model ClientProfile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phoneNumber String?
-  address     String?
-  city        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String     @id @default(cuid())
+  userId        String     @unique
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName   String
+  avatarMediaId String?
+  avatarMedia   MediaFile? @relation("ClientAvatar", fields: [avatarMediaId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 }
 
 /// Perfil de proveedor independiente: estado de verificación, biografía y tarifa.
 model ProviderProfile {
-  id            String         @id @default(cuid())
-  userId        String         @unique
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status        ProviderStatus @default(PENDING)
-  bio           String?
-  hourlyRate    Decimal?       @db.Decimal(10, 2)
-  phoneNumber   String?
-  city          String?
-  ratingAverage Float          @default(0)
-  ratingCount   Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                 String                     @id @default(cuid())
+  userId             String                     @unique
+  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName        String
+  bio                String?
+  level              ProviderLevel              @default(LEVEL_0)
+  ratingAverage      Float                      @default(0)
+  ratingCount        Int                        @default(0)
+  completedJobs      Int                        @default(0)
+  verificationStatus ProviderVerificationStatus @default(NOT_STARTED)
+  avatarMediaId      String?
+  avatarMedia        MediaFile?                 @relation("ProviderAvatar", fields: [avatarMediaId], references: [id])
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
   servicePackages ServicePackage[]
+  verifications   ProviderVerification[]
+  certifications  ProviderCertification[]
 
-  @@index([status])
+  @@index([verificationStatus])
+  @@index([level])
 }
 
 // ===========================================================================
@@ -230,12 +315,18 @@ model Task {
   id          String     @id @default(cuid())
   clientId    String
   client      User       @relation("ClientTasks", fields: [clientId], references: [id])
-  categoryId  String
-  category    Category   @relation(fields: [categoryId], references: [id])
+  categoryId  String?
+  category    Category?  @relation(fields: [categoryId], references: [id])
+  categoryName String    @default("General")
+  locationId  String?
+  location    Location?  @relation(fields: [locationId], references: [id])
   title       String
   description String
   status      TaskStatus @default(DRAFT)
   budget      Decimal?   @db.Decimal(10, 2)
+  budgetMin   Decimal?   @db.Decimal(10, 2)
+  budgetMax   Decimal?   @db.Decimal(10, 2)
+  pricingType PricingType @default(OPEN_TO_OFFERS)
   city        String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -246,6 +337,7 @@ model Task {
 
   @@index([clientId])
   @@index([categoryId])
+  @@index([locationId])
   @@index([status])
 }
 
@@ -257,7 +349,12 @@ model Offer {
   providerId String
   provider   User        @relation("ProviderOffers", fields: [providerId], references: [id])
   price      Decimal     @db.Decimal(10, 2)
-  status     OfferStatus @default(PENDING)
+  amount     Decimal     @db.Decimal(10, 2)
+  estimatedDuration String?
+  includesMaterials Boolean @default(false)
+  requiresTechnicalVisit Boolean @default(false)
+  contactWarning Boolean @default(false)
+  status     OfferStatus @default(SENT)
   message    String?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -284,7 +381,9 @@ model Booking {
   client      User          @relation("ClientBookings", fields: [clientId], references: [id])
   providerId  String
   provider    User          @relation("ProviderBookings", fields: [providerId], references: [id])
-  status      BookingStatus @default(PENDING_PAYMENT)
+  status      BookingStatus @default(CONFIRMED)
+  protectedPaymentStatus ProtectedPaymentStatus @default(NOT_STARTED)
+  agreedPrice Decimal       @db.Decimal(10, 2)
   totalAmount Decimal       @db.Decimal(10, 2)
   platformFee Decimal       @db.Decimal(10, 2)
   createdAt   DateTime      @default(now())
@@ -464,15 +563,103 @@ model ModerationFlag {
 
 /// Archivo multimedia subido por un usuario.
 model MediaFile {
-  id         String    @id @default(cuid())
-  uploaderId String
-  uploader   User      @relation(fields: [uploaderId], references: [id])
-  url        String
-  type       MediaType
-  size       Int
-  createdAt  DateTime  @default(now())
+  id          String       @id @default(cuid())
+  ownerUserId String
+  owner       User         @relation("MediaOwner", fields: [ownerUserId], references: [id])
+  purpose     MediaPurpose
+  fileName    String
+  originalName String
+  mimeType    String
+  sizeBytes   Int
+  storageKey  String
+  publicUrl   String?
+  privateUrl  String?
+  status      MediaStatus  @default(UPLOADED)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  @@index([uploaderId])
+  clientAvatarProfiles   ClientProfile[]   @relation("ClientAvatar")
+  providerAvatarProfiles ProviderProfile[] @relation("ProviderAvatar")
+  providerVerificationFront ProviderVerification[] @relation("ProviderVerificationFront")
+  providerVerificationBack  ProviderVerification[] @relation("ProviderVerificationBack")
+  providerVerificationSelfie ProviderVerification[] @relation("ProviderVerificationSelfie")
+  providerCertifications ProviderCertification[]
+
+  @@index([ownerUserId])
+  @@index([purpose])
+  @@index([status])
+}
+
+/// Verificación manual de identidad de proveedor independiente.
+model ProviderVerification {
+  id                           String                     @id @default(cuid())
+  providerId                   String
+  provider                     ProviderProfile            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  status                       ProviderVerificationStatus @default(PENDING_REVIEW)
+  identityDocumentFrontMediaId String
+  identityDocumentFrontMedia   MediaFile                  @relation("ProviderVerificationFront", fields: [identityDocumentFrontMediaId], references: [id])
+  identityDocumentBackMediaId  String?
+  identityDocumentBackMedia    MediaFile?                 @relation("ProviderVerificationBack", fields: [identityDocumentBackMediaId], references: [id])
+  selfieMediaId                String?
+  selfieMedia                  MediaFile?                 @relation("ProviderVerificationSelfie", fields: [selfieMediaId], references: [id])
+  notes                        String?
+  reviewedByAdminId            String?
+  reviewedByAdmin              User?                      @relation("ProviderVerificationReviewer", fields: [reviewedByAdminId], references: [id])
+  reviewedAt                   DateTime?
+  rejectionReason              String?
+  createdAt                    DateTime                   @default(now())
+  updatedAt                    DateTime                   @updatedAt
+
+  @@index([providerId])
+  @@index([status])
+  @@index([reviewedByAdminId])
+}
+
+/// Certificación o evidencia profesional aportada por un proveedor.
+model ProviderCertification {
+  id                String              @id @default(cuid())
+  providerId        String
+  provider          ProviderProfile     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  title             String
+  issuer            String?
+  mediaId           String
+  media             MediaFile           @relation(fields: [mediaId], references: [id])
+  status            CertificationStatus @default(PENDING_REVIEW)
+  reviewedByAdminId String?
+  reviewedByAdmin   User?               @relation("ProviderCertificationReviewer", fields: [reviewedByAdminId], references: [id])
+  reviewedAt        DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([providerId])
+  @@index([status])
+}
+
+/// Ubicación de cliente o tarea, con soporte para privacidad de dirección exacta.
+model Location {
+  id             String             @id @default(cuid())
+  ownerUserId    String?
+  owner          User?              @relation(fields: [ownerUserId], references: [id])
+  label          String?
+  country        String             @default("Nicaragua")
+  department     String
+  city           String
+  zone           String
+  addressLine1   String
+  addressLine2   String?
+  latitude       Float?
+  longitude      Float?
+  accuracyMeters Int?
+  isExact        Boolean            @default(false)
+  visibility     LocationVisibility @default(APPROXIMATE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  tasks Task[]
+
+  @@index([ownerUserId])
+  @@index([visibility])
+  @@index([city, zone])
 }
 
 /// Notificación dirigida a un usuario.

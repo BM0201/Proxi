@@ -1,11 +1,61 @@
 /**
  * @proxi/ui
  *
- * Librería de componentes React básicos compartidos por las apps web de Proxi.
+ * Libreria de componentes React basicos compartidos por las apps web de Proxi.
  */
 export { Button } from './components/Button';
 export type { ButtonProps } from './components/Button';
-export { Card } from './components/Card';
-export type { CardProps } from './components/Card';
+export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './components/Card';
+export type { CardProps, CardSectionProps } from './components/Card';
 export { Badge } from './components/Badge';
 export type { BadgeProps } from './components/Badge';
+export { EmptyState } from './components/EmptyState';
+export type { EmptyStateProps } from './components/EmptyState';
+export { PageHeader } from './components/PageHeader';
+export type { PageHeaderProps } from './components/PageHeader';
+export { StatCard } from './components/StatCard';
+export type { StatCardProps } from './components/StatCard';
+export { StatusPill } from './components/StatusPill';
+export type { StatusPillProps } from './components/StatusPill';
+export { FormField } from './components/FormField';
+export type { FormFieldProps } from './components/FormField';
+export { TextInput } from './components/TextInput';
+export type { TextInputProps } from './components/TextInput';
+export { Textarea } from './components/Textarea';
+export type { TextareaProps } from './components/Textarea';
+export { Select } from './components/Select';
+export type { SelectOption, SelectProps } from './components/Select';
+export { Tabs } from './components/Tabs';
+export type { TabItem, TabsProps } from './components/Tabs';
+export { SimpleTable } from './components/SimpleTable';
+export type { SimpleTableProps } from './components/SimpleTable';
+export { RatingStars } from './components/RatingStars';
+export type { RatingStarsProps } from './components/RatingStars';
+export { LevelBadge } from './components/LevelBadge';
+export type { LevelBadgeProps } from './components/LevelBadge';
+export { FileUploadCard } from './components/FileUploadCard';
+export type { FileUploadCardProps } from './components/FileUploadCard';
+export { UploadPreview } from './components/UploadPreview';
+export type { UploadPreviewProps } from './components/UploadPreview';
+export { VerificationStatusBadge } from './components/VerificationStatusBadge';
+export type { VerificationStatusBadgeProps } from './components/VerificationStatusBadge';
+export { MapPinSelectorMock } from './components/MapPinSelectorMock';
+export type { MapPinSelectorMockProps } from './components/MapPinSelectorMock';
+export { LocationSummaryCard } from './components/LocationSummaryCard';
+export type { LocationSummaryCardProps } from './components/LocationSummaryCard';
+export { CategoryCard } from './components/CategoryCard';
+export type { CategoryCardProps } from './components/CategoryCard';
+export { TaskCard } from './components/TaskCard';
+export type { TaskCardProps } from './components/TaskCard';
+export { OfferCard } from './components/OfferCard';
+export type { OfferCardProps } from './components/OfferCard';
+export { ProviderCard } from './components/ProviderCard';
+export type { ProviderCardProps } from './components/ProviderCard';
+export { ProtectedPaymentSummary } from './components/ProtectedPaymentSummary';
+export type { ProtectedPaymentSummaryProps } from './components/ProtectedPaymentSummary';
+export { LocationPreview } from './components/LocationPreview';
+export type { LocationPreviewProps } from './components/LocationPreview';
+export { StepFlow } from './components/StepFlow';
+export type { StepFlowItem, StepFlowProps } from './components/StepFlow';
+export { SearchHero } from './components/SearchHero';
+export type { SearchHeroProps } from './components/SearchHero';
