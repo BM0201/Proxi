@@ -9,3 +9,9 @@ export class AdminVerificationDecisionDto {
   @MaxLength(1000)
   rejectionReason?: string;
 }
+
+/** Resolución de un flag de moderación por parte del administrador. */
+export class AdminModerationDecisionDto {
+  @IsIn(['REVIEWED', 'ACTIONED', 'DISMISSED'])
+  status!: 'REVIEWED' | 'ACTIONED' | 'DISMISSED';
+}
