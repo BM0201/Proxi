@@ -16,7 +16,7 @@ import {
   Textarea,
   UploadPreview,
 } from '@proxi/ui';
-import { clienteApi } from '../../../lib/api';
+import { clienteApi, uploadMedia } from '../../../lib/api';
 
 const categoryOptions = [
   { label: 'Electricidad', value: 'Electricidad' },
@@ -35,11 +35,53 @@ const pricingOptions = [
   { label: 'Abierto a ofertas', value: 'OPEN_TO_OFFERS' },
 ];
 
+interface PendingMedia {
+  id: string;
+  originalName: string;
+}
+
 export default function ClienteNewTaskPage() {
   const router = useRouter();
-  const [files, setFiles] = useState<string[]>([]);
+  const [media, setMedia] = useState<PendingMedia[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [latitude, setLatitude] = useState('12.114');
+  const [longitude, setLongitude] = useState('-86.236');
+  const [geoStatus, setGeoStatus] = useState<string | null>(null);
+
+  function useMyLocation() {
+    setGeoStatus(null);
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGeoStatus('Tu navegador no permite geolocalización. Ingresá las coordenadas manualmente.');
+      return;
+    }
+    setGeoStatus('Obteniendo ubicación…');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude.toFixed(6));
+        setLongitude(position.coords.longitude.toFixed(6));
+        setGeoStatus('Ubicación GPS aplicada. La dirección exacta queda protegida hasta el booking.');
+      },
+      (geoError) => {
+        setGeoStatus(`No se pudo obtener el GPS (${geoError.message}). Ingresá las coordenadas manualmente.`);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
+  async function handleFileSelect(file: File) {
+    setError(null);
+    setUploading(true);
+    try {
+      const uploaded = await uploadMedia(file, 'TASK_PHOTO');
+      setMedia((current) => [...current, { id: uploaded.id, originalName: uploaded.originalName }]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir la foto');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,28 +99,14 @@ export default function ClienteNewTaskPage() {
           city: form.get('city'),
           zone: form.get('zone'),
           addressLine1: form.get('addressLine1'),
-          latitude: Number(form.get('latitude')),
-          longitude: Number(form.get('longitude')),
+          latitude: Number(latitude),
+          longitude: Number(longitude),
           isExact: true,
           visibility: 'BOOKING_ONLY',
         }),
       });
 
-      await Promise.all(
-        files.map((fileName) =>
-          clienteApi('/media/upload', {
-            method: 'POST',
-            body: JSON.stringify({
-              purpose: 'TASK_PHOTO',
-              originalName: fileName,
-              mimeType: 'image/jpeg',
-              sizeBytes: 120000,
-            }),
-          }),
-        ),
-      );
-
-      await clienteApi('/tasks', {
+      const task = await clienteApi<{ id: string }>('/tasks', {
         method: 'POST',
         body: JSON.stringify({
           categoryName: form.get('categoryName'),
@@ -90,6 +118,14 @@ export default function ClienteNewTaskPage() {
           locationId: location.id,
         }),
       });
+
+      // Asocia cada foto ya subida (multipart real) a la tarea recién creada.
+      for (const item of media) {
+        await clienteApi(`/tasks/${task.id}/media`, {
+          method: 'POST',
+          body: JSON.stringify({ mediaId: item.id }),
+        });
+      }
 
       router.push('/tasks');
     } catch (err) {
@@ -139,14 +175,15 @@ export default function ClienteNewTaskPage() {
             <CardContent>
               <FileUploadCard
                 title="Agregar fotos"
-                description="Se registra metadata local controlada. No hay S3 real todavía."
+                description="Subida local real (multipart) al almacenamiento del servidor. Sin S3 todavía."
                 accept="image/*"
-                actionLabel="Elegir archivo"
-                onSelect={(file) => setFiles((current) => [...current, file.name])}
+                actionLabel={uploading ? 'Subiendo…' : 'Elegir archivo'}
+                disabled={uploading}
+                onSelect={handleFileSelect}
               />
               <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-                {files.map((file) => (
-                  <UploadPreview key={file} fileName={file} status="uploaded" description="Metadata lista para registrar." />
+                {media.map((item) => (
+                  <UploadPreview key={item.id} fileName={item.originalName} status="uploaded" description="Foto subida; se asociará a la tarea." />
                 ))}
               </div>
             </CardContent>
@@ -157,7 +194,11 @@ export default function ClienteNewTaskPage() {
           <Card title="Ubicación de tarea">
             <CardContent>
               <div style={{ display: 'grid', gap: 14 }}>
-                <MapPinSelectorMock latitude="12.114" longitude="-86.236" label="Selector visual de ubicación" />
+                <MapPinSelectorMock latitude={latitude} longitude={longitude} label="Selector visual de ubicación" />
+                <Button type="button" variant="secondary" onClick={useMyLocation}>
+                  Usar mi ubicación (GPS)
+                </Button>
+                {geoStatus ? <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569' }}>{geoStatus}</p> : null}
                 <FormField label="Departamento">
                   <TextInput name="department" defaultValue="Managua" required />
                 </FormField>
@@ -172,10 +213,10 @@ export default function ClienteNewTaskPage() {
                 </FormField>
                 <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
                   <FormField label="Latitud">
-                    <TextInput name="latitude" type="number" step="0.001" defaultValue="12.114" required />
+                    <TextInput name="latitude" type="number" step="0.000001" value={latitude} onChange={(e) => setLatitude(e.target.value)} required />
                   </FormField>
                   <FormField label="Longitud">
-                    <TextInput name="longitude" type="number" step="0.001" defaultValue="-86.236" required />
+                    <TextInput name="longitude" type="number" step="0.000001" value={longitude} onChange={(e) => setLongitude(e.target.value)} required />
                   </FormField>
                 </div>
               </div>
