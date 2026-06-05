@@ -216,21 +216,21 @@ model User {
   providerProfile ProviderProfile?
   ledgerAccount   LedgerAccount?
 
-  tasks            Task[]           @relation("ClientTasks")
-  offers           Offer[]          @relation("ProviderOffers")
-  clientBookings   Booking[]        @relation("ClientBookings")
-  providerBookings Booking[]        @relation("ProviderBookings")
-  payouts          Payout[]
-  reviewsAuthored  Review[]         @relation("ReviewAuthor")
-  reviewsReceived  Review[]         @relation("ReviewSubject")
-  disputes         Dispute[]        @relation("DisputeInitiator")
-  chatMessages     ChatMessage[]
-  moderationFlags  ModerationFlag[]
-  mediaFiles       MediaFile[]      @relation("MediaOwner")
-  notifications    Notification[]
-  auditLogs        AuditLog[]
-  locations        Location[]
-  reviewedProviderVerifications ProviderVerification[] @relation("ProviderVerificationReviewer")
+  tasks                          Task[]                  @relation("ClientTasks")
+  offers                         Offer[]                 @relation("ProviderOffers")
+  clientBookings                 Booking[]               @relation("ClientBookings")
+  providerBookings               Booking[]               @relation("ProviderBookings")
+  payouts                        Payout[]
+  reviewsAuthored                Review[]                @relation("ReviewAuthor")
+  reviewsReceived                Review[]                @relation("ReviewSubject")
+  disputes                       Dispute[]               @relation("DisputeInitiator")
+  chatMessages                   ChatMessage[]
+  moderationFlags                ModerationFlag[]
+  mediaFiles                     MediaFile[]             @relation("MediaOwner")
+  notifications                  Notification[]
+  auditLogs                      AuditLog[]
+  locations                      Location[]
+  reviewedProviderVerifications  ProviderVerification[]  @relation("ProviderVerificationReviewer")
   reviewedProviderCertifications ProviderCertification[] @relation("ProviderCertificationReviewer")
 
   @@index([role])
@@ -269,6 +269,7 @@ model ProviderProfile {
   servicePackages ServicePackage[]
   verifications   ProviderVerification[]
   certifications  ProviderCertification[]
+  portfolioMedia  ProviderPortfolioMedia[]
 
   @@index([verificationStatus])
   @@index([level])
@@ -312,28 +313,29 @@ model ServicePackage {
 
 /// Tarea publicada por un cliente para recibir ofertas de proveedores.
 model Task {
-  id          String     @id @default(cuid())
-  clientId    String
-  client      User       @relation("ClientTasks", fields: [clientId], references: [id])
-  categoryId  String?
-  category    Category?  @relation(fields: [categoryId], references: [id])
-  categoryName String    @default("General")
-  locationId  String?
-  location    Location?  @relation(fields: [locationId], references: [id])
-  title       String
-  description String
-  status      TaskStatus @default(DRAFT)
-  budget      Decimal?   @db.Decimal(10, 2)
-  budgetMin   Decimal?   @db.Decimal(10, 2)
-  budgetMax   Decimal?   @db.Decimal(10, 2)
-  pricingType PricingType @default(OPEN_TO_OFFERS)
-  city        String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id           String      @id @default(cuid())
+  clientId     String
+  client       User        @relation("ClientTasks", fields: [clientId], references: [id])
+  categoryId   String?
+  category     Category?   @relation(fields: [categoryId], references: [id])
+  categoryName String      @default("General")
+  locationId   String?
+  location     Location?   @relation(fields: [locationId], references: [id])
+  title        String
+  description  String
+  status       TaskStatus  @default(DRAFT)
+  budget       Decimal?    @db.Decimal(10, 2)
+  budgetMin    Decimal?    @db.Decimal(10, 2)
+  budgetMax    Decimal?    @db.Decimal(10, 2)
+  pricingType  PricingType @default(OPEN_TO_OFFERS)
+  city         String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   offers     Offer[]
   booking    Booking?
   chatThread ChatThread?
+  taskMedia  TaskMedia[]
 
   @@index([clientId])
   @@index([categoryId])
@@ -343,21 +345,21 @@ model Task {
 
 /// Oferta enviada por un proveedor a una tarea publicada.
 model Offer {
-  id         String      @id @default(cuid())
-  taskId     String
-  task       Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  providerId String
-  provider   User        @relation("ProviderOffers", fields: [providerId], references: [id])
-  price      Decimal     @db.Decimal(10, 2)
-  amount     Decimal     @db.Decimal(10, 2)
-  estimatedDuration String?
-  includesMaterials Boolean @default(false)
-  requiresTechnicalVisit Boolean @default(false)
-  contactWarning Boolean @default(false)
-  status     OfferStatus @default(SENT)
-  message    String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id                     String      @id @default(cuid())
+  taskId                 String
+  task                   Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  providerId             String
+  provider               User        @relation("ProviderOffers", fields: [providerId], references: [id])
+  price                  Decimal     @db.Decimal(10, 2)
+  amount                 Decimal     @db.Decimal(10, 2)
+  estimatedDuration      String?
+  includesMaterials      Boolean     @default(false)
+  requiresTechnicalVisit Boolean     @default(false)
+  contactWarning         Boolean     @default(false)
+  status                 OfferStatus @default(SENT)
+  message                String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
 
   booking Booking?
 
@@ -372,28 +374,29 @@ model Offer {
 
 /// Reserva (pago protegido) generada al aceptar una oferta.
 model Booking {
-  id          String        @id @default(cuid())
-  taskId      String        @unique
-  task        Task          @relation(fields: [taskId], references: [id])
-  offerId     String        @unique
-  offer       Offer         @relation(fields: [offerId], references: [id])
-  clientId    String
-  client      User          @relation("ClientBookings", fields: [clientId], references: [id])
-  providerId  String
-  provider    User          @relation("ProviderBookings", fields: [providerId], references: [id])
-  status      BookingStatus @default(CONFIRMED)
+  id                     String                 @id @default(cuid())
+  taskId                 String                 @unique
+  task                   Task                   @relation(fields: [taskId], references: [id])
+  offerId                String                 @unique
+  offer                  Offer                  @relation(fields: [offerId], references: [id])
+  clientId               String
+  client                 User                   @relation("ClientBookings", fields: [clientId], references: [id])
+  providerId             String
+  provider               User                   @relation("ProviderBookings", fields: [providerId], references: [id])
+  status                 BookingStatus          @default(CONFIRMED)
   protectedPaymentStatus ProtectedPaymentStatus @default(NOT_STARTED)
-  agreedPrice Decimal       @db.Decimal(10, 2)
-  totalAmount Decimal       @db.Decimal(10, 2)
-  platformFee Decimal       @db.Decimal(10, 2)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  agreedPrice            Decimal                @db.Decimal(10, 2)
+  totalAmount            Decimal                @db.Decimal(10, 2)
+  platformFee            Decimal                @db.Decimal(10, 2)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
   extras        BookingExtra[]
   payment       Payment?
   review        Review[]
   dispute       Dispute?
   ledgerEntries LedgerEntry[]
+  evidenceMedia BookingEvidenceMedia[]
 
   @@index([clientId])
   @@index([providerId])
@@ -563,31 +566,76 @@ model ModerationFlag {
 
 /// Archivo multimedia subido por un usuario.
 model MediaFile {
-  id          String       @id @default(cuid())
-  ownerUserId String
-  owner       User         @relation("MediaOwner", fields: [ownerUserId], references: [id])
-  purpose     MediaPurpose
-  fileName    String
+  id           String       @id @default(cuid())
+  ownerUserId  String
+  owner        User         @relation("MediaOwner", fields: [ownerUserId], references: [id])
+  purpose      MediaPurpose
+  fileName     String
   originalName String
-  mimeType    String
-  sizeBytes   Int
-  storageKey  String
-  publicUrl   String?
-  privateUrl  String?
-  status      MediaStatus  @default(UPLOADED)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String
+  publicUrl    String?
+  privateUrl   String?
+  status       MediaStatus  @default(UPLOADED)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
-  clientAvatarProfiles   ClientProfile[]   @relation("ClientAvatar")
-  providerAvatarProfiles ProviderProfile[] @relation("ProviderAvatar")
-  providerVerificationFront ProviderVerification[] @relation("ProviderVerificationFront")
-  providerVerificationBack  ProviderVerification[] @relation("ProviderVerificationBack")
-  providerVerificationSelfie ProviderVerification[] @relation("ProviderVerificationSelfie")
-  providerCertifications ProviderCertification[]
+  clientAvatarProfiles       ClientProfile[]          @relation("ClientAvatar")
+  providerAvatarProfiles     ProviderProfile[]        @relation("ProviderAvatar")
+  providerVerificationFront  ProviderVerification[]   @relation("ProviderVerificationFront")
+  providerVerificationBack   ProviderVerification[]   @relation("ProviderVerificationBack")
+  providerVerificationSelfie ProviderVerification[]   @relation("ProviderVerificationSelfie")
+  providerCertifications     ProviderCertification[]
+  taskMedia                  TaskMedia[]
+  portfolioMedia             ProviderPortfolioMedia[]
+  bookingEvidence            BookingEvidenceMedia[]
 
   @@index([ownerUserId])
   @@index([purpose])
   @@index([status])
+}
+
+/// Relación entre una tarea y un archivo multimedia adjunto (fotos/videos de la tarea).
+model TaskMedia {
+  id        String    @id @default(cuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     MediaFile @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@unique([taskId, mediaId])
+  @@index([taskId])
+  @@index([mediaId])
+}
+
+/// Relación entre el perfil de un proveedor y un archivo de su portafolio público.
+model ProviderPortfolioMedia {
+  id         String          @id @default(cuid())
+  providerId String
+  provider   ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  mediaId    String
+  media      MediaFile       @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  createdAt  DateTime        @default(now())
+
+  @@unique([providerId, mediaId])
+  @@index([providerId])
+  @@index([mediaId])
+}
+
+/// Relación entre una reserva y un archivo de evidencia (antes/después del trabajo).
+model BookingEvidenceMedia {
+  id        String    @id @default(cuid())
+  bookingId String
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     MediaFile @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@unique([bookingId, mediaId])
+  @@index([bookingId])
+  @@index([mediaId])
 }
 
 /// Verificación manual de identidad de proveedor independiente.

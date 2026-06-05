@@ -82,6 +82,132 @@ export class BookingService {
     return this.toBookingView(updated, user);
   }
 
+  /**
+   * El proveedor inicia el trabajo. Requiere que el pago esté protegido
+   * (Pago protegido = saldo retenido por Proxi). CONFIRMED -> IN_PROGRESS.
+   */
+  async start(user: AuthenticatedUser, id: string) {
+    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    if (!booking) throw new NotFoundException('Reserva no encontrada');
+    if (booking.providerId !== user.id) {
+      throw new ForbiddenException('Solo el proveedor asignado puede iniciar el trabajo');
+    }
+    if (booking.protectedPaymentStatus !== 'PROTECTED') {
+      throw new BadRequestException('El trabajo solo inicia cuando el pago está protegido por Proxi');
+    }
+    if (booking.status !== 'CONFIRMED') {
+      throw new BadRequestException('La reserva debe estar confirmada para iniciar');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.task.update({ where: { id: booking.taskId }, data: { status: 'IN_PROGRESS' } });
+      return tx.booking.update({
+        where: { id },
+        data: { status: 'IN_PROGRESS' },
+        include: this.bookingInclude(),
+      });
+    });
+    return this.toBookingView(updated, user);
+  }
+
+  /**
+   * El proveedor marca el trabajo como terminado de su lado.
+   * IN_PROGRESS -> COMPLETED_BY_PROVIDER. El cliente debe confirmar luego.
+   */
+  async completeByProvider(user: AuthenticatedUser, id: string) {
+    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    if (!booking) throw new NotFoundException('Reserva no encontrada');
+    if (booking.providerId !== user.id) {
+      throw new ForbiddenException('Solo el proveedor asignado puede marcar el trabajo como terminado');
+    }
+    if (booking.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('El trabajo debe estar en progreso para marcarlo como terminado');
+    }
+
+    const updated = await this.prisma.booking.update({
+      where: { id },
+      data: { status: 'COMPLETED_BY_PROVIDER' },
+      include: this.bookingInclude(),
+    });
+    return this.toBookingView(updated, user);
+  }
+
+  /**
+   * El cliente confirma la finalización. Esto libera el pago protegido hacia el
+   * saldo aprobado del proveedor (Liquidación en sandbox vía libro mayor).
+   * COMPLETED_BY_PROVIDER -> CONFIRMED_BY_CLIENT/COMPLETED + APPROVED_FOR_PAYOUT.
+   *
+   * SANDBOX: no se mueve dinero real; solo se registran movimientos en el
+   * LedgerEntry/LedgerAccount como saldo aprobado para liquidación futura.
+   * TODO: integrar pasarela de pago real y liquidación bancaria en producción.
+   */
+  async confirmByClient(user: AuthenticatedUser, id: string) {
+    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    if (!booking) throw new NotFoundException('Reserva no encontrada');
+    if (booking.clientId !== user.id) {
+      throw new ForbiddenException('Solo el cliente puede confirmar la finalización del trabajo');
+    }
+    if (booking.status !== 'COMPLETED_BY_PROVIDER') {
+      throw new BadRequestException('El proveedor debe marcar el trabajo como terminado antes de confirmar');
+    }
+
+    const netForProvider = Number(booking.totalAmount) - Number(booking.platformFee);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Marcar tarea y reserva como completadas + pago aprobado para liquidación.
+      await tx.task.update({ where: { id: booking.taskId }, data: { status: 'COMPLETED' } });
+      const result = await tx.booking.update({
+        where: { id },
+        data: { status: 'COMPLETED', protectedPaymentStatus: 'APPROVED_FOR_PAYOUT' },
+        include: this.bookingInclude(),
+      });
+
+      // Asegurar cuenta de libro mayor del proveedor (Saldo aprobado).
+      const account = await tx.ledgerAccount.upsert({
+        where: { userId: booking.providerId },
+        update: {},
+        create: { userId: booking.providerId },
+      });
+
+      // Liberar el monto retenido y acreditar el saldo disponible (sandbox).
+      await tx.ledgerEntry.create({
+        data: {
+          accountId: account.id,
+          bookingId: booking.id,
+          type: 'RELEASE',
+          amount: booking.totalAmount,
+          description: 'Liberación de pago protegido tras confirmación del cliente (sandbox)',
+        },
+      });
+      await tx.ledgerEntry.create({
+        data: {
+          accountId: account.id,
+          bookingId: booking.id,
+          type: 'CREDIT',
+          amount: netForProvider,
+          description: 'Saldo aprobado para liquidación del proveedor (sandbox, neto de comisión Proxi)',
+        },
+      });
+      await tx.ledgerAccount.update({
+        where: { id: account.id },
+        data: {
+          availableBalance: { increment: netForProvider },
+          balance: { increment: netForProvider },
+        },
+      });
+
+      // Incrementar trabajos completados del proveedor.
+      await tx.providerProfile.updateMany({
+        where: { userId: booking.providerId },
+        data: { completedJobs: { increment: 1 } },
+      });
+
+      return result;
+    });
+
+    return this.toBookingView(updated, user);
+  }
+
   private assertCanRead(user: AuthenticatedUser, booking: { clientId: string; providerId: string }) {
     if (
       booking.clientId !== user.id &&

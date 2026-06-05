@@ -1,0 +1,3 @@
+# Archivos subidos en desarrollo local (no versionar binarios).
+local/**
+!local/.gitkeep

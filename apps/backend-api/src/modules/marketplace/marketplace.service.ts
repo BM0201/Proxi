@@ -1,10 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { detectExternalContact } from '../../common/moderation/detect-external-contact';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CreateOfferDto, CreateTaskDto, UpdateTaskDto } from './marketplace.dto';
-
-const externalContactPattern =
-  /(\+?\d[\d\s().-]{7,}\d)|([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})|(https?:\/\/|www\.)|(whats?app|telegram)/i;
 
 @Injectable()
 export class MarketplaceService {
@@ -108,7 +106,9 @@ export class MarketplaceService {
     }
 
     const message = [dto.message, dto.conditions].filter(Boolean).join('\n\nCondiciones: ');
-    const contactWarning = externalContactPattern.test(message);
+    // Anti-fuga: detectamos posibles intentos de contacto externo en el mensaje de la oferta.
+    const leak = detectExternalContact(message);
+    const contactWarning = leak.detected;
 
     const offer = await this.prisma.offer.create({
       data: {
@@ -130,6 +130,22 @@ export class MarketplaceService {
       where: { id: task.id },
       data: { status: 'RECEIVING_OFFERS' },
     });
+
+    // Si se detectó posible contacto externo, generamos un flag de moderación (estado OPEN).
+    // Nota: ModerationFlag.reporterId es un FK obligatorio a User. Como Proxi no tiene un
+    // "usuario sistema", usamos al autor del mensaje (el proveedor) como reporterId; el motivo
+    // documenta que la detección es automática. El equipo de moderación revisa estos flags.
+    if (leak.detected) {
+      await this.prisma.moderationFlag.create({
+        data: {
+          entityType: 'OFFER',
+          entityId: offer.id,
+          reporterId: user.id,
+          reason: `Detección automática anti-fuga: ${leak.reasons.join('; ')}`,
+          status: 'OPEN',
+        },
+      });
+    }
 
     return this.toOfferView(offer, user);
   }

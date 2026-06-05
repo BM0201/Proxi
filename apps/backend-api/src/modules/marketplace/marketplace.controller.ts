@@ -6,13 +6,18 @@ import { JwtAuthGuard, Roles, RolesGuard } from '../auth/auth.guards';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CreateOfferDto, CreateTaskDto, UpdateTaskDto } from './marketplace.dto';
 import { MarketplaceService } from './marketplace.service';
+import { AttachMediaDto } from '../media/media.dto';
+import { MediaService } from '../media/media.service';
 
 @ApiTags('tasks-offers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller()
 export class MarketplaceController {
-  constructor(private readonly marketplaceService: MarketplaceService) {}
+  constructor(
+    private readonly marketplaceService: MarketplaceService,
+    private readonly mediaService: MediaService,
+  ) {}
 
   @Post('tasks')
   @Roles('CLIENT')
@@ -47,6 +52,23 @@ export class MarketplaceController {
   @Roles('CLIENT')
   removeTask(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.marketplaceService.removeTask(user, id);
+  }
+
+  /** Asocia un archivo ya subido (TASK_PHOTO/TASK_VIDEO) a una tarea propia del cliente. */
+  @Post('tasks/:id/media')
+  @Roles('CLIENT', 'ADMIN', 'SUPER_ADMIN')
+  attachTaskMedia(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: AttachMediaDto,
+  ) {
+    return this.mediaService.attachTaskMedia(user, id, dto.mediaId);
+  }
+
+  /** Lista los archivos adjuntos de una tarea. */
+  @Get('tasks/:id/media')
+  listTaskMedia(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.mediaService.listTaskMedia(user, id);
   }
 
   @Post('offers')

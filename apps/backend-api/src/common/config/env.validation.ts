@@ -38,6 +38,11 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CORS_ORIGINS?: string;
+
+  /** Carpeta de almacenamiento local de archivos (subidas reales). */
+  @IsString()
+  @IsOptional()
+  LOCAL_STORAGE_PATH?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

@@ -40,6 +40,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "db:generate": "turbo run db:generate",
     "db:migrate": "pnpm --filter @proxi/database db:migrate",
+    "db:migrate:dev": "pnpm --filter @proxi/database db:migrate:dev",
     "db:seed": "pnpm --filter @proxi/database db:seed",
     "db:studio": "pnpm --filter @proxi/database db:studio",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
