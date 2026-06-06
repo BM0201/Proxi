@@ -132,3 +132,6 @@ export const paginationSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type PaginationDto = z.infer<typeof paginationSchema>;
+
+export * from './reputation.dto';
+export * from './quick-task.dto';

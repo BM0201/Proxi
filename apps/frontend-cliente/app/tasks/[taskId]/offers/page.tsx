@@ -23,12 +23,12 @@ interface ApiOffer {
 }
 
 const levelMap: Record<string, 0 | 1 | 2 | 3 | 4 | 5> = {
-  LEVEL_0: 0,
-  LEVEL_1: 1,
-  LEVEL_2: 2,
-  LEVEL_3: 3,
-  LEVEL_4_PRO: 4,
-  LEVEL_5_PREMIUM: 5,
+  LEVEL_0_NEW: 0,
+  LEVEL_1_VERIFIED: 1,
+  LEVEL_2_TRUSTED: 2,
+  LEVEL_3_GOLD: 3,
+  LEVEL_4_PLATINUM: 4,
+  LEVEL_5_DIAMOND: 5,
 };
 
 export default function ClienteTaskOffersPage() {

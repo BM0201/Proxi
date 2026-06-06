@@ -13,13 +13,16 @@ export enum UserStatus {
 }
 
 export enum ProviderLevel {
-  LEVEL_0 = 'LEVEL_0',
-  LEVEL_1 = 'LEVEL_1',
-  LEVEL_2 = 'LEVEL_2',
-  LEVEL_3 = 'LEVEL_3',
-  LEVEL_4_PRO = 'LEVEL_4_PRO',
-  LEVEL_5_PREMIUM = 'LEVEL_5_PREMIUM',
+  LEVEL_0_NEW = 'LEVEL_0_NEW',
+  LEVEL_1_VERIFIED = 'LEVEL_1_VERIFIED',
+  LEVEL_2_TRUSTED = 'LEVEL_2_TRUSTED',
+  LEVEL_3_GOLD = 'LEVEL_3_GOLD',
+  LEVEL_4_PLATINUM = 'LEVEL_4_PLATINUM',
+  LEVEL_5_DIAMOND = 'LEVEL_5_DIAMOND',
 }
+
+export * from './reputation';
+export * from './task-types';
 
 export enum ProviderVerificationStatus {
   NOT_STARTED = 'NOT_STARTED',

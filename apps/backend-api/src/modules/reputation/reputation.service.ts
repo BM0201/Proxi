@@ -14,7 +14,26 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { detectExternalContact } from '../../common/moderation/detect-external-contact';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { CreateReviewDto } from './reputation.dto';
+import { CreateReputationEventDto, CreateReviewDto } from './reputation.dto';
+import {
+  ClientLevel,
+  InactivityStatus,
+  ProviderLevel,
+  ReputationSummaryDto,
+  TrustStatus,
+  UserRole,
+} from '@proxi/contracts';
+import {
+  calculateClientLevel,
+  calculateProviderLevel,
+  getLevelColor,
+  getLevelLabel,
+} from './helpers/level-calculator';
+import {
+  calculateTrustStatus,
+  clampTrustScore,
+  getTrustLabel,
+} from './helpers/trust-score-calculator';
 
 @Injectable()
 export class ReputationService {
@@ -118,5 +137,207 @@ export class ReputationService {
       comment: review.comment,
       createdAt: review.createdAt,
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resúmenes de reputación (niveles + confianza)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Resumen de reputación de un usuario. Resuelve automáticamente si es
+   * Proveedor independiente o Cliente según su perfil; si tiene ambos,
+   * se prioriza el rol indicado (o el de Proveedor).
+   */
+  async getReputationSummary(userId: string, preferRole?: UserRole): Promise<ReputationSummaryDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { providerProfile: true, clientProfile: true },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const wantsClient = preferRole === UserRole.CLIENT;
+    if (user.providerProfile && !wantsClient) {
+      return this.buildProviderSummary(userId, user.providerProfile);
+    }
+    if (user.clientProfile) {
+      return this.buildClientSummary(userId, user.clientProfile);
+    }
+    if (user.providerProfile) {
+      return this.buildProviderSummary(userId, user.providerProfile);
+    }
+    throw new NotFoundException('El usuario no tiene perfil de reputación');
+  }
+
+  /** Resumen de reputación a partir del id del perfil de Proveedor. */
+  async getProviderReputation(providerId: string): Promise<ReputationSummaryDto> {
+    const profile = await this.prisma.providerProfile.findUnique({ where: { id: providerId } });
+    if (!profile) throw new NotFoundException('Perfil de proveedor no encontrado');
+    return this.buildProviderSummary(profile.userId, profile);
+  }
+
+  /** Resumen de reputación a partir del id del perfil de Cliente. */
+  async getClientReputation(clientId: string): Promise<ReputationSummaryDto> {
+    const profile = await this.prisma.clientProfile.findUnique({ where: { id: clientId } });
+    if (!profile) throw new NotFoundException('Perfil de cliente no encontrado');
+    return this.buildClientSummary(profile.userId, profile);
+  }
+
+  private buildProviderSummary(
+    userId: string,
+    profile: {
+      level: string;
+      trustScore: number;
+      trustStatus: string;
+      ratingAverage: number | null;
+      ratingCount: number;
+      completedJobs: number;
+      inactivityStatus: string;
+    },
+  ): ReputationSummaryDto {
+    const level = profile.level as ProviderLevel;
+    const trustStatus = profile.trustStatus as TrustStatus;
+    return {
+      userId,
+      role: UserRole.PROVIDER,
+      level,
+      levelLabel: getLevelLabel(level),
+      levelColor: getLevelColor(level),
+      stars: profile.ratingAverage ?? null,
+      ratingCount: profile.ratingCount,
+      trustScore: profile.trustScore,
+      trustStatus,
+      trustLabel: getTrustLabel(trustStatus),
+      completedTasks: profile.completedJobs,
+      cancelledTasks: 0,
+      inactivityStatus: profile.inactivityStatus as InactivityStatus,
+    };
+  }
+
+  private buildClientSummary(
+    userId: string,
+    profile: {
+      level: string;
+      trustScore: number;
+      trustStatus: string;
+      ratingAverage: unknown;
+      ratingCount: number;
+      completedTasksAsClient: number;
+      cancelledTasksCount: number;
+      inactivityStatus: string;
+    },
+  ): ReputationSummaryDto {
+    const level = profile.level as ClientLevel;
+    const trustStatus = profile.trustStatus as TrustStatus;
+    const stars = profile.ratingAverage != null ? Number(profile.ratingAverage) : null;
+    return {
+      userId,
+      role: UserRole.CLIENT,
+      level,
+      levelLabel: getLevelLabel(level),
+      levelColor: getLevelColor(level),
+      stars,
+      ratingCount: profile.ratingCount,
+      trustScore: profile.trustScore,
+      trustStatus,
+      trustLabel: getTrustLabel(trustStatus),
+      completedTasks: profile.completedTasksAsClient,
+      cancelledTasks: profile.cancelledTasksCount,
+      inactivityStatus: profile.inactivityStatus as InactivityStatus,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Eventos de reputación
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Registra un evento de reputación y aplica su impacto al trustScore del
+   * usuario, recalculando estado de confianza y nivel.
+   */
+  async createReputationEvent(dto: CreateReputationEventDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.userId },
+      include: { providerProfile: true, clientProfile: true },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const event = await this.prisma.reputationEvent.create({
+      data: {
+        userId: dto.userId,
+        role: dto.role,
+        eventType: dto.eventType,
+        scoreImpact: dto.scoreImpact,
+        reason: dto.reason ?? null,
+        relatedTaskId: dto.relatedTaskId ?? null,
+        relatedBookingId: dto.relatedBookingId ?? null,
+      },
+    });
+
+    await this.applyEventImpact(dto.userId, dto.role, dto.scoreImpact);
+
+    return {
+      id: event.id,
+      userId: event.userId,
+      role: event.role,
+      eventType: event.eventType,
+      scoreImpact: event.scoreImpact,
+      reason: event.reason,
+      createdAt: event.createdAt,
+    };
+  }
+
+  /** Aplica el impacto del evento al perfil correspondiente y recalcula nivel. */
+  private async applyEventImpact(userId: string, role: UserRole, scoreImpact: number) {
+    if (role === UserRole.PROVIDER) {
+      const profile = await this.prisma.providerProfile.findUnique({ where: { userId } });
+      if (!profile) return;
+      const trustScore = clampTrustScore(profile.trustScore + scoreImpact);
+      const trustStatus = calculateTrustStatus(trustScore);
+      const level = calculateProviderLevel({
+        isVerified: profile.verificationStatus === 'APPROVED',
+        completedJobs: profile.completedJobs,
+        ratingAverage: profile.ratingAverage ?? null,
+      });
+      await this.prisma.providerProfile.update({
+        where: { userId },
+        data: { trustScore, trustStatus, level },
+      });
+      return;
+    }
+
+    if (role === UserRole.CLIENT) {
+      const profile = await this.prisma.clientProfile.findUnique({ where: { userId } });
+      if (!profile) return;
+      const trustScore = clampTrustScore(profile.trustScore + scoreImpact);
+      const trustStatus = calculateTrustStatus(trustScore);
+      const level = calculateClientLevel({
+        isVerified: profile.level !== ClientLevel.CLIENT_0_NEW,
+        completedTasksAsClient: profile.completedTasksAsClient,
+        cancelledTasksCount: profile.cancelledTasksCount,
+      });
+      await this.prisma.clientProfile.update({
+        where: { userId },
+        data: { trustScore, trustStatus, level },
+      });
+    }
+  }
+
+  /** Lista los eventos de reputación de un usuario (más recientes primero). */
+  async listEvents(userId: string) {
+    const events = await this.prisma.reputationEvent.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return events.map((event) => ({
+      id: event.id,
+      role: event.role,
+      eventType: event.eventType,
+      scoreImpact: event.scoreImpact,
+      reason: event.reason,
+      relatedTaskId: event.relatedTaskId,
+      relatedBookingId: event.relatedBookingId,
+      createdAt: event.createdAt,
+    }));
   }
 }

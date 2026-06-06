@@ -8,8 +8,31 @@ import { CreateOfferDto, CreateTaskDto, UpdateTaskDto } from './marketplace.dto'
 export class MarketplaceService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Límite de duración de una Tarea estándar: 1 día = 1440 minutos. */
+  private static readonly STANDARD_TASK_MAX_MINUTES = 1440;
+
   async createTask(user: AuthenticatedUser, dto: CreateTaskDto) {
     if (dto.locationId) await this.assertLocationOwner(user.id, dto.locationId);
+
+    // Los proyectos por paquete (varios días) llegarán en el Sprint 2.
+    if (dto.taskType === 'PACKAGE_PROJECT') {
+      throw new BadRequestException(
+        'Los proyectos por paquete estarán disponibles próximamente. Por ahora crea una Tarea estándar o rápida.',
+      );
+    }
+
+    // Una Tarea estándar no puede superar 1 día. Si la duración estimada lo
+    // supera, se debe usar un proyecto por paquete (Próximamente).
+    if (
+      dto.estimatedDurationMinutes != null &&
+      dto.estimatedDurationMinutes > MarketplaceService.STANDARD_TASK_MAX_MINUTES
+    ) {
+      throw new BadRequestException(
+        'La duración estimada supera 1 día. Este trabajo corresponde a un proyecto por paquete (Próximamente).',
+      );
+    }
+
+    const taskType = dto.taskType ?? 'STANDARD_TASK';
 
     const task = await this.prisma.task.create({
       data: {
@@ -20,6 +43,8 @@ export class MarketplaceService {
         title: dto.title,
         description: dto.description,
         status: 'RECEIVING_OFFERS',
+        taskType,
+        estimatedDurationMinutes: dto.estimatedDurationMinutes,
         budgetMin: dto.budgetMin,
         budgetMax: dto.budgetMax,
         budget: dto.budgetMax ?? dto.budgetMin,
@@ -307,6 +332,8 @@ export class MarketplaceService {
       title: task.title,
       description: task.description,
       status: task.status,
+      taskType: task.taskType,
+      estimatedDurationMinutes: task.estimatedDurationMinutes ?? null,
       budgetMin: task.budgetMin === null ? null : Number(task.budgetMin),
       budgetMax: task.budgetMax === null ? null : Number(task.budgetMax),
       pricingType: task.pricingType,
@@ -327,7 +354,7 @@ export class MarketplaceService {
       provider: {
         id: offer.providerId,
         displayName: providerProfile?.displayName ?? offer.provider?.displayName ?? 'Proveedor independiente',
-        level: providerProfile?.level ?? 'LEVEL_0',
+        level: providerProfile?.level ?? 'LEVEL_0_NEW',
         ratingAverage: providerProfile?.ratingAverage ?? 0,
         ratingCount: providerProfile?.ratingCount ?? 0,
         completedJobs: providerProfile?.completedJobs ?? 0,

@@ -46,6 +46,17 @@ export class CreateTaskDto {
   @IsOptional()
   @IsIn(['FIXED', 'HOURLY', 'DAILY', 'TECHNICAL_VISIT', 'OPEN_TO_OFFERS'])
   pricingType?: 'FIXED' | 'HOURLY' | 'DAILY' | 'TECHNICAL_VISIT' | 'OPEN_TO_OFFERS';
+
+  /** Tipo de Tarea. Por defecto STANDARD_TASK (Tarea estándar con ofertas). */
+  @IsOptional()
+  @IsIn(['QUICK_TASK', 'STANDARD_TASK', 'PACKAGE_PROJECT'])
+  taskType?: 'QUICK_TASK' | 'STANDARD_TASK' | 'PACKAGE_PROJECT';
+
+  /** Duración estimada en minutos. Si supera 1 día (1440 min) se sugiere PACKAGE_PROJECT. */
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  estimatedDurationMinutes?: number;
 }
 
 export class UpdateTaskDto {

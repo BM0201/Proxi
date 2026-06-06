@@ -139,8 +139,27 @@ async function seedDemoAccounts() {
   });
   await prisma.clientProfile.upsert({
     where: { userId: client.id },
-    update: { displayName: 'Cliente Demo' },
-    create: { userId: client.id, displayName: 'Cliente Demo' },
+    update: {
+      displayName: 'Cliente Demo',
+      level: 'CLIENT_1_VERIFIED',
+      trustScore: 80,
+      trustStatus: 'NORMAL',
+      ratingAverage: 4.6,
+      ratingCount: 6,
+      completedTasksAsClient: 8,
+      cancelledTasksCount: 1,
+    },
+    create: {
+      userId: client.id,
+      displayName: 'Cliente Demo',
+      level: 'CLIENT_1_VERIFIED',
+      trustScore: 80,
+      trustStatus: 'NORMAL',
+      ratingAverage: 4.6,
+      ratingCount: 6,
+      completedTasksAsClient: 8,
+      cancelledTasksCount: 1,
+    },
   });
 
   // 3. Proveedor demo (con perfil): Nivel 1-2, rating/jobs mock, verificación APPROVED.
@@ -155,7 +174,9 @@ async function seedDemoAccounts() {
     update: {
       displayName: 'Proveedor Demo',
       bio: 'Proveedor independiente con experiencia en instalaciones y reparaciones del hogar.',
-      level: 'LEVEL_2',
+      level: 'LEVEL_2_TRUSTED',
+      trustScore: 88,
+      trustStatus: 'NORMAL',
       ratingAverage: 4.7,
       ratingCount: 23,
       completedJobs: 31,
@@ -165,7 +186,9 @@ async function seedDemoAccounts() {
       userId: provider.id,
       displayName: 'Proveedor Demo',
       bio: 'Proveedor independiente con experiencia en instalaciones y reparaciones del hogar.',
-      level: 'LEVEL_2',
+      level: 'LEVEL_2_TRUSTED',
+      trustScore: 88,
+      trustStatus: 'NORMAL',
       ratingAverage: 4.7,
       ratingCount: 23,
       completedJobs: 31,
@@ -327,11 +350,275 @@ async function seedTasksAndOffers(clientId: string, providerId: string) {
   console.log('  ✔ 3 tareas demo y 3 ofertas demo (SENT, ACCEPTED, REJECTED).');
 }
 
+/**
+ * Seed de reputación: 3 Proveedores en distintos niveles, 2 Clientes,
+ * Tareas (2 rápidas + 1 estándar) y eventos de reputación de ejemplo.
+ */
+async function seedReputationFixtures(demoClientId: string) {
+  console.log('🌱 Seed de reputación (niveles, confianza, tipos de Tarea)...');
+
+  // --- 3 Proveedores independientes en distintos niveles ---
+  const providersSpec = [
+    {
+      email: 'proveedor.nuevo@proxi.local',
+      displayName: 'Proveedor Nuevo',
+      level: 'LEVEL_0_NEW' as const,
+      trustScore: 70,
+      ratingAverage: 0,
+      ratingCount: 0,
+      completedJobs: 0,
+      verificationStatus: 'NOT_STARTED' as const,
+      bio: 'Proveedor independiente recién registrado en Proxi.',
+    },
+    {
+      email: 'proveedor.verificado@proxi.local',
+      displayName: 'Proveedor Verificado',
+      level: 'LEVEL_1_VERIFIED' as const,
+      trustScore: 80,
+      ratingAverage: 4.5,
+      ratingCount: 5,
+      completedJobs: 5,
+      verificationStatus: 'APPROVED' as const,
+      bio: 'Proveedor independiente verificado con primeras Tareas completadas.',
+    },
+    {
+      email: 'proveedor.oro@proxi.local',
+      displayName: 'Proveedor Oro',
+      level: 'LEVEL_3_GOLD' as const,
+      trustScore: 95,
+      ratingAverage: 4.9,
+      ratingCount: 48,
+      completedJobs: 50,
+      verificationStatus: 'APPROVED' as const,
+      bio: 'Proveedor independiente de nivel Oro con amplia trayectoria.',
+    },
+  ];
+
+  const createdProviders = [] as Array<{ userId: string; displayName: string }>;
+  for (const spec of providersSpec) {
+    const user = await upsertDemoUser({
+      email: spec.email,
+      password: 'ProxiProveedor123!',
+      role: 'PROVIDER',
+      displayName: spec.displayName,
+    });
+    await prisma.providerProfile.upsert({
+      where: { userId: user.id },
+      update: {
+        displayName: spec.displayName,
+        bio: spec.bio,
+        level: spec.level,
+        trustScore: spec.trustScore,
+        trustStatus: 'NORMAL',
+        ratingAverage: spec.ratingAverage,
+        ratingCount: spec.ratingCount,
+        completedJobs: spec.completedJobs,
+        verificationStatus: spec.verificationStatus,
+      },
+      create: {
+        userId: user.id,
+        displayName: spec.displayName,
+        bio: spec.bio,
+        level: spec.level,
+        trustScore: spec.trustScore,
+        trustStatus: 'NORMAL',
+        ratingAverage: spec.ratingAverage,
+        ratingCount: spec.ratingCount,
+        completedJobs: spec.completedJobs,
+        verificationStatus: spec.verificationStatus,
+      },
+    });
+    createdProviders.push({ userId: user.id, displayName: spec.displayName });
+  }
+
+  // --- 2 Clientes en distintos niveles ---
+  const clientsSpec = [
+    {
+      email: 'cliente.nuevo@proxi.local',
+      displayName: 'Cliente Nuevo',
+      level: 'CLIENT_0_NEW' as const,
+      trustScore: 70,
+      completedTasksAsClient: 0,
+      cancelledTasksCount: 0,
+    },
+    {
+      email: 'cliente.verificado@proxi.local',
+      displayName: 'Cliente Verificado',
+      level: 'CLIENT_1_VERIFIED' as const,
+      trustScore: 85,
+      completedTasksAsClient: 10,
+      cancelledTasksCount: 1,
+    },
+  ];
+
+  for (const spec of clientsSpec) {
+    const user = await upsertDemoUser({
+      email: spec.email,
+      password: 'ProxiCliente123!',
+      role: 'CLIENT',
+      displayName: spec.displayName,
+    });
+    await prisma.clientProfile.upsert({
+      where: { userId: user.id },
+      update: {
+        displayName: spec.displayName,
+        level: spec.level,
+        trustScore: spec.trustScore,
+        trustStatus: 'NORMAL',
+        completedTasksAsClient: spec.completedTasksAsClient,
+        cancelledTasksCount: spec.cancelledTasksCount,
+      },
+      create: {
+        userId: user.id,
+        displayName: spec.displayName,
+        level: spec.level,
+        trustScore: spec.trustScore,
+        trustStatus: 'NORMAL',
+        completedTasksAsClient: spec.completedTasksAsClient,
+        cancelledTasksCount: spec.cancelledTasksCount,
+      },
+    });
+  }
+
+  // --- Tareas de ejemplo por tipo (2 rápidas + 1 estándar) ---
+  const location = await ensureClientLocation(demoClientId);
+
+  async function ensureTypedTask(params: {
+    title: string;
+    description: string;
+    categoryName: string;
+    taskType: 'QUICK_TASK' | 'STANDARD_TASK';
+    quickTaskMode?: 'DIRECT_ACCEPT' | 'QUICK_AUCTION';
+    estimatedDurationMinutes?: number;
+    radiusKm?: number;
+    minProviderRating?: number;
+    minProviderTrustScore?: number;
+    budgetMin: number;
+    budgetMax: number;
+    pricingType?: 'FIXED' | 'OPEN_TO_OFFERS';
+  }) {
+    const existing = await prisma.task.findFirst({
+      where: { clientId: demoClientId, title: params.title },
+    });
+    if (existing) {
+      return prisma.task.update({
+        where: { id: existing.id },
+        data: {
+          taskType: params.taskType,
+          quickTaskMode: params.quickTaskMode ?? null,
+          estimatedDurationMinutes: params.estimatedDurationMinutes ?? null,
+          radiusKm: params.radiusKm ?? null,
+          minProviderRating: params.minProviderRating ?? null,
+          minProviderTrustScore: params.minProviderTrustScore ?? null,
+        },
+      });
+    }
+    return prisma.task.create({
+      data: {
+        clientId: demoClientId,
+        title: params.title,
+        description: params.description,
+        categoryName: params.categoryName,
+        locationId: location.id,
+        status: 'RECEIVING_OFFERS',
+        taskType: params.taskType,
+        quickTaskMode: params.quickTaskMode ?? null,
+        estimatedDurationMinutes: params.estimatedDurationMinutes ?? null,
+        radiusKm: params.radiusKm ?? null,
+        minProviderRating: params.minProviderRating ?? null,
+        minProviderTrustScore: params.minProviderTrustScore ?? null,
+        budgetMin: params.budgetMin,
+        budgetMax: params.budgetMax,
+        budget: params.budgetMax,
+        pricingType: params.pricingType ?? 'FIXED',
+      },
+    });
+  }
+
+  await ensureTypedTask({
+    title: 'Tarea rápida: cambiar tomacorriente',
+    description: 'Necesito cambiar un tomacorriente dañado en la cocina. Trabajo corto, hoy mismo.',
+    categoryName: 'Electricidad básica',
+    taskType: 'QUICK_TASK',
+    quickTaskMode: 'DIRECT_ACCEPT',
+    estimatedDurationMinutes: 45,
+    radiusKm: 5,
+    minProviderTrustScore: 70,
+    budgetMin: 250,
+    budgetMax: 400,
+    pricingType: 'FIXED',
+  });
+
+  await ensureTypedTask({
+    title: 'Tarea rápida: armar mueble pequeño',
+    description: 'Armar un mueble pequeño tipo repisa. Recibo varias ofertas por subasta rápida.',
+    categoryName: 'Instalaciones',
+    taskType: 'QUICK_TASK',
+    quickTaskMode: 'QUICK_AUCTION',
+    estimatedDurationMinutes: 90,
+    radiusKm: 8,
+    minProviderRating: 4.0,
+    budgetMin: 300,
+    budgetMax: 600,
+    pricingType: 'OPEN_TO_OFFERS',
+  });
+
+  await ensureTypedTask({
+    title: 'Tarea estándar: pintar una habitación',
+    description: 'Pintar una habitación de 4x4 metros. Trabajo de un día, recibo ofertas de Proveedores.',
+    categoryName: 'Reparaciones del hogar',
+    taskType: 'STANDARD_TASK',
+    estimatedDurationMinutes: 480,
+    budgetMin: 1200,
+    budgetMax: 2000,
+    pricingType: 'OPEN_TO_OFFERS',
+  });
+
+  // --- Eventos de reputación de ejemplo ---
+  // Idempotencia: recreamos los eventos demo del Proveedor Oro si ya existen.
+  const gold = createdProviders.find((p) => p.displayName === 'Proveedor Oro');
+  if (gold) {
+    const already = await prisma.reputationEvent.count({ where: { userId: gold.userId } });
+    if (already === 0) {
+      await prisma.reputationEvent.createMany({
+        data: [
+          {
+            userId: gold.userId,
+            role: 'PROVIDER',
+            eventType: 'TASK_COMPLETED',
+            scoreImpact: 2,
+            reason: 'Tarea completada con éxito.',
+          },
+          {
+            userId: gold.userId,
+            role: 'PROVIDER',
+            eventType: 'GOOD_REVIEW',
+            scoreImpact: 3,
+            reason: 'Reseña de 5 estrellas del Cliente.',
+          },
+          {
+            userId: gold.userId,
+            role: 'PROVIDER',
+            eventType: 'MANUAL_ADMIN_ADJUSTMENT',
+            scoreImpact: 0,
+            reason: 'Ajuste inicial de confianza por trayectoria verificada.',
+          },
+        ],
+      });
+    }
+  }
+
+  console.log(
+    `  ✔ ${providersSpec.length} proveedores, ${clientsSpec.length} clientes, 3 tareas (2 rápidas + 1 estándar) y eventos de reputación.`,
+  );
+}
+
 async function main(): Promise<void> {
   console.log('🌱 Iniciando seed de Proxi...');
   await seedCategories();
   const { client, provider } = await seedDemoAccounts();
   await seedTasksAndOffers(client.id, provider.id);
+  await seedReputationFixtures(client.id);
   console.log('✅ Seed completado correctamente.');
   console.log('   Credenciales demo:');
   console.log('     Admin:     admin@proxi.local     / ProxiAdmin123!');

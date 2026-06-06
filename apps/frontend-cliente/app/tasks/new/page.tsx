@@ -17,6 +17,12 @@ import {
   UploadPreview,
 } from '@proxi/ui';
 import { clienteApi, uploadMedia } from '../../../lib/api';
+import { TaskTypeSelector, TaskTypeOption } from '../../../components/TaskTypeSelector';
+
+const quickModeOptions = [
+  { label: 'Aceptación directa (primer Proveedor elegible)', value: 'DIRECT_ACCEPT' },
+  { label: 'Subasta rápida (varias ofertas en poco tiempo)', value: 'QUICK_AUCTION' },
+];
 
 const categoryOptions = [
   { label: 'Electricidad', value: 'Electricidad' },
@@ -49,6 +55,7 @@ export default function ClienteNewTaskPage() {
   const [latitude, setLatitude] = useState('12.114');
   const [longitude, setLongitude] = useState('-86.236');
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
+  const [taskType, setTaskType] = useState<TaskTypeOption>('STANDARD_TASK');
 
   function useMyLocation() {
     setGeoStatus(null);
@@ -106,18 +113,38 @@ export default function ClienteNewTaskPage() {
         }),
       });
 
-      const task = await clienteApi<{ id: string }>('/tasks', {
-        method: 'POST',
-        body: JSON.stringify({
-          categoryName: form.get('categoryName'),
-          title: form.get('title'),
-          description: form.get('description'),
-          budgetMin: Number(form.get('budgetMin')),
-          budgetMax: Number(form.get('budgetMax')),
-          pricingType: form.get('pricingType'),
-          locationId: location.id,
-        }),
-      });
+      let task: { id: string };
+      if (taskType === 'QUICK_TASK') {
+        task = await clienteApi<{ id: string }>('/quick-tasks', {
+          method: 'POST',
+          body: JSON.stringify({
+            categoryName: form.get('categoryName'),
+            title: form.get('title'),
+            description: form.get('description'),
+            quickTaskMode: form.get('quickTaskMode'),
+            estimatedDurationMinutes: Number(form.get('estimatedDurationMinutes')),
+            radiusKm: Number(form.get('radiusKm')),
+            budgetMin: Number(form.get('budgetMin')),
+            budgetMax: Number(form.get('budgetMax')),
+            pricingType: form.get('pricingType'),
+            locationId: location.id,
+          }),
+        });
+      } else {
+        task = await clienteApi<{ id: string }>('/tasks', {
+          method: 'POST',
+          body: JSON.stringify({
+            categoryName: form.get('categoryName'),
+            title: form.get('title'),
+            description: form.get('description'),
+            taskType: 'STANDARD_TASK',
+            budgetMin: Number(form.get('budgetMin')),
+            budgetMax: Number(form.get('budgetMax')),
+            pricingType: form.get('pricingType'),
+            locationId: location.id,
+          }),
+        });
+      }
 
       // Asocia cada foto ya subida (multipart real) a la tarea recién creada.
       for (const item of media) {
@@ -144,6 +171,27 @@ export default function ClienteNewTaskPage() {
 
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 18, gridTemplateColumns: 'minmax(0, 1fr) minmax(300px, 0.8fr)' }}>
         <div style={{ display: 'grid', gap: 18 }}>
+          <Card title="Tipo de tarea">
+            <CardContent>
+              <div style={{ display: 'grid', gap: 14 }}>
+                <TaskTypeSelector value={taskType} onChange={setTaskType} />
+                {taskType === 'QUICK_TASK' ? (
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                    <FormField label="Modo de tarea rápida">
+                      <Select name="quickTaskMode" options={quickModeOptions} defaultValue="DIRECT_ACCEPT" />
+                    </FormField>
+                    <FormField label="Duración estimada (minutos)" hint="Máximo 1 día (1440 min).">
+                      <TextInput name="estimatedDurationMinutes" type="number" min="1" max="1440" defaultValue="60" />
+                    </FormField>
+                    <FormField label="Radio de cobertura (km)">
+                      <TextInput name="radiusKm" type="number" step="0.5" min="0.5" max="100" defaultValue="5" />
+                    </FormField>
+                  </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card title="Qué necesitás resolver">
             <CardContent>
               <div style={{ display: 'grid', gap: 16 }}>

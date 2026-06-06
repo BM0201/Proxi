@@ -9,11 +9,13 @@ const navItems = [
   { label: 'Inicio', href: '/' },
   { label: 'Publicar tarea', href: '/tasks/new' },
   { label: 'Tareas', href: '/tasks' },
+  { label: 'Tareas rápidas', href: '/quick-tasks' },
   { label: 'Ofertas', href: '/offers' },
   { label: 'Mensajes', href: '/messages' },
   { label: 'Reservas', href: '/bookings' },
   { label: 'Pagos', href: '/payments' },
   { label: 'Reseñas', href: '/reviews' },
+  { label: 'Reputación', href: '/account/reputation' },
   { label: 'Perfil', href: '/account' },
 ];
 

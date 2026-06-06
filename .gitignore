@@ -47,3 +47,4 @@ coverage/
 
 # Docker
 infra/docker/data/
+.abacus.donotdelete

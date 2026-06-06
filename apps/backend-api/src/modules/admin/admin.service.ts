@@ -189,7 +189,7 @@ export class AdminService {
       where: { id: verification.providerId },
       data: {
         verificationStatus: dto.status,
-        level: dto.status === 'APPROVED' ? 'LEVEL_1' : undefined,
+        level: dto.status === 'APPROVED' ? 'LEVEL_1_VERIFIED' : undefined,
       },
     });
 

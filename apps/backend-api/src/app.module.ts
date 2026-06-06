@@ -19,6 +19,7 @@ import { BookingModule } from './modules/booking/booking.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ReputationModule } from './modules/reputation/reputation.module';
+import { QuickTasksModule } from './modules/quick-tasks/quick-tasks.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { MediaModule } from './modules/media/media.module';
@@ -44,6 +45,7 @@ import { LocationsModule } from './modules/locations/locations.module';
     ChatModule,
     PaymentsModule,
     ReputationModule,
+    QuickTasksModule,
     SubscriptionsModule,
     DisputesModule,
     MediaModule,
