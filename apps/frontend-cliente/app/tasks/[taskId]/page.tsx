@@ -78,6 +78,11 @@ export default function ClienteTaskDetailPage() {
           <Link href={`/tasks/${view.id}/offers`} style={{ textDecoration: 'none' }}>
             <Button style={{ width: '100%' }}>Ver ofertas</Button>
           </Link>
+          <Link href={`/tasks/${view.id}/materials`} style={{ textDecoration: 'none' }}>
+            <Button variant="secondary" style={{ width: '100%' }}>
+              Materiales (Lista Proxi)
+            </Button>
+          </Link>
         </div>
       </div>
 

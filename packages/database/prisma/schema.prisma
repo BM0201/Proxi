@@ -95,6 +95,49 @@ enum ReputationEventType {
   MANUAL_ADMIN_ADJUSTMENT
 }
 
+// Herramientas y materiales (Sprint 2)
+enum ToolRequirement {
+  CLIENT_PROVIDES_TOOLS
+  PROVIDER_BRINGS_TOOLS
+  NO_TOOLS_REQUIRED
+}
+
+enum MaterialResponsibility {
+  CLIENT_ALREADY_HAS_MATERIALS
+  CLIENT_NEEDS_PURCHASE_LIST
+  NEEDS_DIAGNOSIS_FIRST
+  NO_MATERIALS_REQUIRED
+}
+
+enum MaterialStatus {
+  NO_MATERIALS_REQUIRED
+  CLIENT_ALREADY_HAS_MATERIALS
+  PURCHASE_LIST_PENDING_PROVIDER
+  PURCHASE_LIST_SENT
+  CLIENT_BUYING_MATERIALS
+  MATERIALS_READY
+  MATERIALS_INCORRECT
+  MISSING_MATERIALS
+  NEEDS_UPDATE
+}
+
+enum MaterialItemPriority {
+  REQUIRED
+  OPTIONAL
+  RECOMMENDED
+  ALTERNATIVE
+}
+
+enum StoreType {
+  HARDWARE_STORE
+  HOME_IMPROVEMENT
+  ELECTRICAL_SUPPLY
+  PLUMBING_SUPPLY
+  PAINT_STORE
+  GENERAL_STORE
+  OTHER
+}
+
 enum ProviderVerificationStatus {
   NOT_STARTED
   PENDING_REVIEW
@@ -312,6 +355,8 @@ model ClientProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  packageProjects PackageProject[]
+
   @@index([level])
   @@index([trustStatus])
 }
@@ -347,6 +392,9 @@ model ProviderProfile {
   verifications   ProviderVerification[]
   certifications  ProviderCertification[]
   portfolioMedia  ProviderPortfolioMedia[]
+  tools           ProviderTool[]
+  purchaseLists   PurchaseList[]
+  packageProjects PackageProject[]
 
   @@index([verificationStatus])
   @@index([level])
@@ -416,6 +464,12 @@ model Task {
   minProviderRating        Decimal?       @db.Decimal(3, 2)
   minProviderTrustScore    Int?
 
+  // Herramientas y materiales (Sprint 2)
+  toolRequirement        ToolRequirement        @default(NO_TOOLS_REQUIRED)
+  requiredTools          Json?
+  materialResponsibility MaterialResponsibility @default(NO_MATERIALS_REQUIRED)
+  materialStatus         MaterialStatus         @default(NO_MATERIALS_REQUIRED)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -424,6 +478,8 @@ model Task {
   chatThread       ChatThread?
   taskMedia        TaskMedia[]
   reputationEvents ReputationEvent[]
+  purchaseList     PurchaseList?
+  packageProject   PackageProject?
 
   @@index([taskType])
   @@index([clientId])
@@ -849,4 +905,149 @@ model ReputationEvent {
   @@index([userId])
   @@index([eventType])
   @@index([role])
+}
+
+// ===========================================================================
+// HERRAMIENTAS, MATERIALES, TIENDAS Y PAQUETES (Sprint 2)
+// ===========================================================================
+
+/// Herramienta que un proveedor independiente declara tener para realizar tareas.
+model ProviderTool {
+  id          String          @id @default(cuid())
+  providerId  String
+  provider    ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  name        String
+  category    String?
+  description String?
+  isVerified  Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([providerId])
+}
+
+/// Lista Proxi: lista de materiales que el cliente debe comprar antes del servicio.
+model PurchaseList {
+  id               String                        @id @default(cuid())
+  taskId           String                        @unique
+  task             Task                          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  providerId       String?
+  provider         ProviderProfile?              @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  status           MaterialStatus                @default(PURCHASE_LIST_PENDING_PROVIDER)
+  notes            String?
+  items            PurchaseListItem[]
+  storeSuggestions PurchaseListStoreSuggestion[]
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+
+  @@index([providerId])
+  @@index([status])
+}
+
+/// Ítem individual de una Lista Proxi de materiales.
+model PurchaseListItem {
+  id                String               @id @default(cuid())
+  purchaseListId    String
+  purchaseList      PurchaseList         @relation(fields: [purchaseListId], references: [id], onDelete: Cascade)
+  name              String
+  quantity          Decimal              @db.Decimal(10, 2)
+  unit              String
+  specification     String?
+  priority          MaterialItemPriority @default(REQUIRED)
+  estimatedPriceMin Decimal?             @db.Decimal(10, 2)
+  estimatedPriceMax Decimal?             @db.Decimal(10, 2)
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([purchaseListId])
+}
+
+/// Tienda o ferretería sugerida/patrocinada donde el cliente puede comprar materiales.
+model PartnerStore {
+  id            String                        @id @default(cuid())
+  name          String
+  type          StoreType
+  description   String?
+  country       String                        @default("Nicaragua")
+  department    String?
+  city          String?
+  zone          String?
+  addressLine   String?
+  latitude      Decimal?                      @db.Decimal(10, 8)
+  longitude     Decimal?                      @db.Decimal(11, 8)
+  phoneInternal String?
+  websiteUrl    String?
+  isSponsored   Boolean                       @default(false)
+  isActive      Boolean                       @default(true)
+  suggestions   PurchaseListStoreSuggestion[]
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@index([department])
+}
+
+/// Sugerencia de tienda asociada a una Lista Proxi.
+model PurchaseListStoreSuggestion {
+  id             String       @id @default(cuid())
+  purchaseListId String
+  purchaseList   PurchaseList @relation(fields: [purchaseListId], references: [id], onDelete: Cascade)
+  storeId        String
+  store          PartnerStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  reason         String?
+  isSponsored    Boolean      @default(false)
+  priority       Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@index([purchaseListId])
+  @@index([storeId])
+}
+
+/// Paquete/proyecto: tarea compuesta por varios bloques de servicio acordados.
+model PackageProject {
+  id                 String           @id @default(cuid())
+  taskId             String           @unique
+  task               Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  clientId           String
+  client             ClientProfile    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  providerId         String?
+  provider           ProviderProfile? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  title              String
+  description        String
+  totalDays          Int
+  estimatedStartDate DateTime?
+  estimatedEndDate   DateTime?
+  totalPrice         Decimal?         @db.Decimal(10, 2)
+  status             String           @default("DRAFT")
+  serviceBlocks      ServiceBlock[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([clientId])
+  @@index([providerId])
+  @@index([status])
+}
+
+/// Bloque de servicio acordado dentro de un paquete/proyecto.
+model ServiceBlock {
+  id                       String         @id @default(cuid())
+  packageProjectId         String
+  packageProject           PackageProject @relation(fields: [packageProjectId], references: [id], onDelete: Cascade)
+  bookingId                String?
+  date                     DateTime
+  startTime                String
+  endTime                  String
+  checkInAt                DateTime?
+  checkOutAt               DateTime?
+  status                   String         @default("SCHEDULED")
+  providerPresenceStatus   String         @default("NOT_REQUIRED_YET")
+  clientConfirmationStatus String         @default("PENDING")
+  notes                    String?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  @@index([packageProjectId])
+  @@index([status])
 }

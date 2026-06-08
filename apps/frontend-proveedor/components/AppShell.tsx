@@ -11,6 +11,7 @@ const navItems = [
   { label: 'Verificación', href: '/verification' },
   { label: 'Perfil', href: '/profile' },
   { label: 'Servicios', href: '/services' },
+  { label: 'Herramientas', href: '/tools' },
   { label: 'Paquetes', href: '/packages' },
   { label: 'Tareas disponibles', href: '/tasks' },
   { label: 'Ofertas', href: '/offers' },

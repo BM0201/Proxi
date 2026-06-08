@@ -613,12 +613,366 @@ async function seedReputationFixtures(demoClientId: string) {
   );
 }
 
+/**
+ * Seed de Sprint 2: Herramientas del Proveedor, Lista Proxi de materiales,
+ * tiendas/ferreterías sugeridas y un proyecto por paquete con bloques de servicio.
+ *
+ * Regla oficial de Proxi: el Proveedor independiente NO compra materiales. El
+ * Cliente compra los materiales con la Lista Proxi que arma el Proveedor.
+ */
+async function seedToolsMaterialsAndPackages(
+  demoClientUserId: string,
+  demoProviderProfileId: string,
+): Promise<void> {
+  console.log('🌱 Seed de herramientas, materiales (Lista Proxi), tiendas y paquetes...');
+
+  // ---------------------------------------------------------------------------
+  // 1. Herramientas del Proveedor (no son materiales del Cliente).
+  // ---------------------------------------------------------------------------
+  // Resolvemos los perfiles de los proveedores de reputación por displayName.
+  const goldProfile = await prisma.providerProfile.findFirst({
+    where: { displayName: 'Proveedor Oro' },
+  });
+  const verifiedProfile = await prisma.providerProfile.findFirst({
+    where: { displayName: 'Proveedor Verificado' },
+  });
+
+  /** Crea las herramientas de un proveedor de forma idempotente. */
+  async function ensureTools(
+    providerId: string,
+    tools: Array<{ name: string; category: string; description?: string; isVerified?: boolean }>,
+  ) {
+    for (const tool of tools) {
+      const existing = await prisma.providerTool.findFirst({
+        where: { providerId, name: tool.name },
+      });
+      if (existing) continue;
+      await prisma.providerTool.create({
+        data: {
+          providerId,
+          name: tool.name,
+          category: tool.category,
+          description: tool.description,
+          isVerified: tool.isVerified ?? false,
+        },
+      });
+    }
+  }
+
+  // Proveedor Demo (login proveedor@proxi.local): set completo de herramientas.
+  await ensureTools(demoProviderProfileId, [
+    { name: 'Taladro percutor', category: 'Eléctrica', description: 'Taladro inalámbrico con brocas para concreto y madera.', isVerified: true },
+    { name: 'Escalera de extensión', category: 'Acceso', description: 'Escalera de aluminio de 6 metros.' },
+    { name: 'Juego de llaves', category: 'Manual', description: 'Llaves combinadas milimétricas y en pulgadas.' },
+    { name: 'Martillo', category: 'Manual' },
+    { name: 'Nivel láser', category: 'Medición', description: 'Nivel láser autonivelante.', isVerified: true },
+    { name: 'Carro de carga', category: 'Transporte', description: 'Carretilla plegable para materiales.' },
+  ]);
+
+  // Proveedor Oro: set amplio que refuerza su nivel.
+  if (goldProfile) {
+    await ensureTools(goldProfile.id, [
+      { name: 'Taladro percutor', category: 'Eléctrica', isVerified: true },
+      { name: 'Escalera de extensión', category: 'Acceso' },
+      { name: 'Juego de llaves', category: 'Manual' },
+      { name: 'Martillo', category: 'Manual' },
+      { name: 'Nivel láser', category: 'Medición', isVerified: true },
+      { name: 'Carro de carga', category: 'Transporte' },
+    ]);
+  }
+
+  // Proveedor Verificado: set básico.
+  if (verifiedProfile) {
+    await ensureTools(verifiedProfile.id, [
+      { name: 'Caja de herramientas', category: 'Manual', description: 'Set básico de herramientas manuales.' },
+      { name: 'Martillo', category: 'Manual' },
+    ]);
+  }
+  // Proveedor Nuevo: sin herramientas declaradas (intencional).
+
+  // ---------------------------------------------------------------------------
+  // 2. Tiendas/ferreterías sugeridas (catálogo de PartnerStore).
+  // ---------------------------------------------------------------------------
+  const storeSpecs: Array<{
+    name: string;
+    type: 'HARDWARE_STORE' | 'HOME_IMPROVEMENT' | 'ELECTRICAL_SUPPLY' | 'PLUMBING_SUPPLY' | 'PAINT_STORE' | 'GENERAL_STORE' | 'OTHER';
+    description: string;
+    department: string;
+    city: string;
+    zone: string;
+    addressLine: string;
+    latitude: number;
+    longitude: number;
+    isSponsored: boolean;
+  }> = [
+    {
+      name: 'Ferretería Central',
+      type: 'HARDWARE_STORE',
+      description: 'Ferretería general con amplio surtido de materiales de construcción.',
+      department: 'Managua',
+      city: 'Managua',
+      zone: 'Centro',
+      addressLine: 'Avenida Bolívar, Managua',
+      latitude: 12.136,
+      longitude: -86.251,
+      isSponsored: false,
+    },
+    {
+      name: 'EPA Nicaragua Demo',
+      type: 'HOME_IMPROVEMENT',
+      description: 'Tienda de mejoras para el hogar con materiales eléctricos y de construcción.',
+      department: 'Managua',
+      city: 'Managua',
+      zone: 'Carretera a Masaya',
+      addressLine: 'Km 6 Carretera a Masaya',
+      latitude: 12.108,
+      longitude: -86.249,
+      isSponsored: true,
+    },
+    {
+      name: 'Ferretería Don José',
+      type: 'HARDWARE_STORE',
+      description: 'Ferretería de barrio con atención personalizada.',
+      department: 'Managua',
+      city: 'Managua',
+      zone: 'Bello Horizonte',
+      addressLine: 'Rotonda Bello Horizonte, 2c al sur',
+      latitude: 12.128,
+      longitude: -86.219,
+      isSponsored: false,
+    },
+    {
+      name: 'Sinsa Demo',
+      type: 'ELECTRICAL_SUPPLY',
+      description: 'Materiales eléctricos y de construcción de primera calidad.',
+      department: 'Managua',
+      city: 'Managua',
+      zone: 'Carretera a Masaya',
+      addressLine: 'Km 4.5 Carretera a Masaya',
+      latitude: 12.115,
+      longitude: -86.255,
+      isSponsored: true,
+    },
+  ];
+
+  const stores: Record<string, { id: string }> = {};
+  for (const spec of storeSpecs) {
+    const existing = await prisma.partnerStore.findFirst({ where: { name: spec.name } });
+    const store = existing
+      ? await prisma.partnerStore.update({ where: { id: existing.id }, data: { ...spec } })
+      : await prisma.partnerStore.create({ data: { ...spec } });
+    stores[spec.name] = store;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. Lista Proxi de materiales para la tarea "Instalar abanico de techo".
+  // ---------------------------------------------------------------------------
+  const fanTask = await prisma.task.findFirst({
+    where: { clientId: demoClientUserId, title: 'Instalar abanico de techo' },
+  });
+
+  if (fanTask) {
+    // La Tarea pasa a requerir Lista Proxi y materiales comprados por el Cliente.
+    await prisma.task.update({
+      where: { id: fanTask.id },
+      data: {
+        materialResponsibility: 'CLIENT_NEEDS_PURCHASE_LIST',
+        materialStatus: 'PURCHASE_LIST_SENT',
+        toolRequirement: 'PROVIDER_BRINGS_TOOLS',
+      },
+    });
+
+    let list = await prisma.purchaseList.findUnique({ where: { taskId: fanTask.id } });
+    if (!list) {
+      list = await prisma.purchaseList.create({
+        data: {
+          taskId: fanTask.id,
+          providerId: demoProviderProfileId,
+          status: 'PURCHASE_LIST_SENT',
+          notes:
+            'Comprá estos materiales antes del servicio. Te recomiendo comprar todo en una sola ferretería. El abanico ya lo tenés, pero confirmá que venga con su kit de montaje.',
+        },
+      });
+
+      await prisma.purchaseListItem.createMany({
+        data: [
+          {
+            purchaseListId: list.id,
+            name: 'Abanico de techo',
+            quantity: 1,
+            unit: 'unidad',
+            specification: 'Con kit de montaje y aspas incluidas.',
+            priority: 'REQUIRED',
+            estimatedPriceMin: 1800,
+            estimatedPriceMax: 2500,
+            notes: 'Si ya lo compraste, no es necesario volver a comprarlo.',
+          },
+          {
+            purchaseListId: list.id,
+            name: 'Tornillos y tarugos',
+            quantity: 1,
+            unit: 'juego',
+            specification: 'Tornillos para concreto con tarugos de expansión.',
+            priority: 'REQUIRED',
+            estimatedPriceMin: 80,
+            estimatedPriceMax: 150,
+          },
+          {
+            purchaseListId: list.id,
+            name: 'Cable eléctrico THHN #12',
+            quantity: 3,
+            unit: 'metros',
+            specification: 'Cable de cobre calibre 12 para la conexión.',
+            priority: 'REQUIRED',
+            estimatedPriceMin: 60,
+            estimatedPriceMax: 120,
+          },
+          {
+            purchaseListId: list.id,
+            name: 'Interruptor de pared con regulador',
+            quantity: 1,
+            unit: 'unidad',
+            specification: 'Interruptor con control de velocidad para abanico.',
+            priority: 'OPTIONAL',
+            estimatedPriceMin: 250,
+            estimatedPriceMax: 450,
+            notes: 'Opcional: solo si querés regular la velocidad desde la pared.',
+          },
+        ],
+      });
+    }
+
+    // Sugerencias de tiendas (las patrocinadas con mayor prioridad).
+    const suggestionSpecs = [
+      { storeName: 'Sinsa Demo', reason: 'Tienen el cable y el interruptor que necesitás.', isSponsored: true, priority: 10 },
+      { storeName: 'EPA Nicaragua Demo', reason: 'Buen surtido de abanicos y materiales eléctricos.', isSponsored: true, priority: 9 },
+      { storeName: 'Ferretería Central', reason: 'Opción cercana para tornillos y tarugos.', isSponsored: false, priority: 5 },
+    ];
+    for (const sug of suggestionSpecs) {
+      const store = stores[sug.storeName];
+      if (!store) continue;
+      const existingSug = await prisma.purchaseListStoreSuggestion.findFirst({
+        where: { purchaseListId: list.id, storeId: store.id },
+      });
+      if (existingSug) continue;
+      await prisma.purchaseListStoreSuggestion.create({
+        data: {
+          purchaseListId: list.id,
+          storeId: store.id,
+          reason: sug.reason,
+          isSponsored: sug.isSponsored,
+          priority: sug.priority,
+        },
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. Proyecto por paquete demo "Remodelación de baño" con 3 bloques de servicio.
+  // ---------------------------------------------------------------------------
+  const clientProfile = await prisma.clientProfile.findUnique({
+    where: { userId: demoClientUserId },
+  });
+  const clientLocation = await prisma.location.findFirst({
+    where: { ownerUserId: demoClientUserId },
+  });
+
+  if (clientProfile) {
+    let packageTask = await prisma.task.findFirst({
+      where: { clientId: demoClientUserId, title: 'Remodelación de baño' },
+    });
+    if (!packageTask) {
+      packageTask = await prisma.task.create({
+        data: {
+          clientId: demoClientUserId,
+          title: 'Remodelación de baño',
+          description:
+            'Proyecto por paquete para remodelar el baño principal: cambio de azulejos, instalación de sanitario y pintura. Trabajo de varios días con bloques de servicio acordados.',
+          categoryName: 'Reparaciones',
+          locationId: clientLocation?.id,
+          status: 'RECEIVING_OFFERS',
+          taskType: 'PACKAGE_PROJECT',
+          toolRequirement: 'PROVIDER_BRINGS_TOOLS',
+          materialResponsibility: 'CLIENT_NEEDS_PURCHASE_LIST',
+          materialStatus: 'PURCHASE_LIST_PENDING_PROVIDER',
+          budgetMin: 8000,
+          budgetMax: 15000,
+          budget: 15000,
+          pricingType: 'OPEN_TO_OFFERS',
+        },
+      });
+    }
+
+    let pkg = await prisma.packageProject.findUnique({ where: { taskId: packageTask.id } });
+    if (!pkg) {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() + 7);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 2);
+
+      pkg = await prisma.packageProject.create({
+        data: {
+          taskId: packageTask.id,
+          clientId: clientProfile.id,
+          providerId: demoProviderProfileId,
+          title: 'Remodelación de baño',
+          description:
+            'Proyecto de 3 días: demolición y preparación, instalación de azulejos y sanitario, y acabados de pintura.',
+          totalDays: 3,
+          estimatedStartDate: startDate,
+          estimatedEndDate: endDate,
+          totalPrice: 12500,
+          status: 'DRAFT',
+        },
+      });
+
+      const blockDates = [0, 1, 2].map((offset) => {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + offset);
+        return d;
+      });
+
+      await prisma.serviceBlock.createMany({
+        data: [
+          {
+            packageProjectId: pkg.id,
+            date: blockDates[0],
+            startTime: '08:00',
+            endTime: '16:00',
+            status: 'SCHEDULED',
+            notes: 'Día 1: demolición de azulejos viejos y preparación de superficies.',
+          },
+          {
+            packageProjectId: pkg.id,
+            date: blockDates[1],
+            startTime: '08:00',
+            endTime: '17:00',
+            status: 'SCHEDULED',
+            notes: 'Día 2: instalación de azulejos nuevos y montaje del sanitario.',
+          },
+          {
+            packageProjectId: pkg.id,
+            date: blockDates[2],
+            startTime: '09:00',
+            endTime: '15:00',
+            status: 'SCHEDULED',
+            notes: 'Día 3: acabados, sellado y pintura final.',
+          },
+        ],
+      });
+    }
+  }
+
+  console.log('  ✔ Herramientas, Lista Proxi, tiendas y paquete demo asegurados.');
+}
+
 async function main(): Promise<void> {
   console.log('🌱 Iniciando seed de Proxi...');
   await seedCategories();
-  const { client, provider } = await seedDemoAccounts();
+  const { client, provider, providerProfile } = await seedDemoAccounts();
   await seedTasksAndOffers(client.id, provider.id);
   await seedReputationFixtures(client.id);
+  await seedToolsMaterialsAndPackages(client.id, providerProfile.id);
   console.log('✅ Seed completado correctamente.');
   console.log('   Credenciales demo:');
   console.log('     Admin:     admin@proxi.local     / ProxiAdmin123!');

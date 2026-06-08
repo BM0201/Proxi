@@ -11,6 +11,24 @@ export class MarketplaceService {
   /** Límite de duración de una Tarea estándar: 1 día = 1440 minutos. */
   private static readonly STANDARD_TASK_MAX_MINUTES = 1440;
 
+  /**
+   * Deriva el estado inicial de materiales (MaterialStatus) a partir de la
+   * responsabilidad de materiales declarada por el Cliente.
+   */
+  private static deriveMaterialStatus(responsibility: string): any {
+    switch (responsibility) {
+      case 'CLIENT_ALREADY_HAS_MATERIALS':
+        return 'CLIENT_ALREADY_HAS_MATERIALS';
+      case 'CLIENT_NEEDS_PURCHASE_LIST':
+        return 'PURCHASE_LIST_PENDING_PROVIDER';
+      case 'NEEDS_DIAGNOSIS_FIRST':
+        return 'NEEDS_UPDATE';
+      case 'NO_MATERIALS_REQUIRED':
+      default:
+        return 'NO_MATERIALS_REQUIRED';
+    }
+  }
+
   async createTask(user: AuthenticatedUser, dto: CreateTaskDto) {
     if (dto.locationId) await this.assertLocationOwner(user.id, dto.locationId);
 
@@ -33,6 +51,9 @@ export class MarketplaceService {
     }
 
     const taskType = dto.taskType ?? 'STANDARD_TASK';
+    const toolRequirement = dto.toolRequirement ?? 'NO_TOOLS_REQUIRED';
+    const materialResponsibility = dto.materialResponsibility ?? 'NO_MATERIALS_REQUIRED';
+    const materialStatus = MarketplaceService.deriveMaterialStatus(materialResponsibility);
 
     const task = await this.prisma.task.create({
       data: {
@@ -45,6 +66,9 @@ export class MarketplaceService {
         status: 'RECEIVING_OFFERS',
         taskType,
         estimatedDurationMinutes: dto.estimatedDurationMinutes,
+        toolRequirement,
+        materialResponsibility,
+        materialStatus,
         budgetMin: dto.budgetMin,
         budgetMax: dto.budgetMax,
         budget: dto.budgetMax ?? dto.budgetMin,
@@ -334,6 +358,9 @@ export class MarketplaceService {
       status: task.status,
       taskType: task.taskType,
       estimatedDurationMinutes: task.estimatedDurationMinutes ?? null,
+      toolRequirement: task.toolRequirement,
+      materialResponsibility: task.materialResponsibility,
+      materialStatus: task.materialStatus,
       budgetMin: task.budgetMin === null ? null : Number(task.budgetMin),
       budgetMax: task.budgetMax === null ? null : Number(task.budgetMax),
       pricingType: task.pricingType,

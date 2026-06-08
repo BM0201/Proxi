@@ -23,6 +23,7 @@ export enum ProviderLevel {
 
 export * from './reputation';
 export * from './task-types';
+export * from './tools-materials';
 
 export enum ProviderVerificationStatus {
   NOT_STARTED = 'NOT_STARTED',

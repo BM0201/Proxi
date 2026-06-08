@@ -41,6 +41,19 @@ const pricingOptions = [
   { label: 'Abierto a ofertas', value: 'OPEN_TO_OFFERS' },
 ];
 
+const toolRequirementOptions = [
+  { label: 'No se requieren herramientas', value: 'NO_TOOLS_REQUIRED' },
+  { label: 'El Proveedor trae sus herramientas', value: 'PROVIDER_BRINGS_TOOLS' },
+  { label: 'Yo (Cliente) aporto las herramientas', value: 'CLIENT_PROVIDES_TOOLS' },
+];
+
+const materialResponsibilityOptions = [
+  { label: 'No se requieren materiales', value: 'NO_MATERIALS_REQUIRED' },
+  { label: 'Ya tengo los materiales', value: 'CLIENT_ALREADY_HAS_MATERIALS' },
+  { label: 'Necesito que el Proveedor me arme una Lista Proxi', value: 'CLIENT_NEEDS_PURCHASE_LIST' },
+  { label: 'Primero se necesita un diagnóstico', value: 'NEEDS_DIAGNOSIS_FIRST' },
+];
+
 interface PendingMedia {
   id: string;
   originalName: string;
@@ -56,6 +69,8 @@ export default function ClienteNewTaskPage() {
   const [longitude, setLongitude] = useState('-86.236');
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
   const [taskType, setTaskType] = useState<TaskTypeOption>('STANDARD_TASK');
+  const [toolRequirement, setToolRequirement] = useState('NO_TOOLS_REQUIRED');
+  const [materialResponsibility, setMaterialResponsibility] = useState('NO_MATERIALS_REQUIRED');
 
   function useMyLocation() {
     setGeoStatus(null);
@@ -138,6 +153,8 @@ export default function ClienteNewTaskPage() {
             title: form.get('title'),
             description: form.get('description'),
             taskType: 'STANDARD_TASK',
+            toolRequirement,
+            materialResponsibility,
             budgetMin: Number(form.get('budgetMin')),
             budgetMax: Number(form.get('budgetMax')),
             pricingType: form.get('pricingType'),
@@ -218,6 +235,68 @@ export default function ClienteNewTaskPage() {
               </div>
             </CardContent>
           </Card>
+
+          {taskType !== 'QUICK_TASK' ? (
+            <Card title="Herramientas y materiales">
+              <CardContent>
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <FormField
+                    label="Herramientas"
+                    hint="Las herramientas son del Proveedor independiente (taladro, escalera, llaves…)."
+                  >
+                    <Select
+                      name="toolRequirement"
+                      options={toolRequirementOptions}
+                      value={toolRequirement}
+                      onChange={(e) => setToolRequirement(e.target.value)}
+                    />
+                  </FormField>
+                  <FormField
+                    label="Materiales"
+                    hint="Regla Proxi: el Proveedor NO compra los materiales. Vos (Cliente) los comprás."
+                  >
+                    <Select
+                      name="materialResponsibility"
+                      options={materialResponsibilityOptions}
+                      value={materialResponsibility}
+                      onChange={(e) => setMaterialResponsibility(e.target.value)}
+                    />
+                  </FormField>
+                  {materialResponsibility === 'CLIENT_NEEDS_PURCHASE_LIST' ? (
+                    <div
+                      style={{
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: 10,
+                        padding: '0.75rem 0.9rem',
+                        fontSize: 13,
+                        color: '#1e40af',
+                      }}
+                    >
+                      📋 El Proveedor independiente te armará una <strong>Lista Proxi</strong> con los
+                      materiales que necesitás comprar antes del servicio. Recordá: el Proveedor no
+                      compra los materiales; vos los comprás (te sugeriremos ferreterías cercanas).
+                    </div>
+                  ) : null}
+                  {materialResponsibility === 'NEEDS_DIAGNOSIS_FIRST' ? (
+                    <div
+                      style={{
+                        background: '#fef9c3',
+                        border: '1px solid #fde68a',
+                        borderRadius: 10,
+                        padding: '0.75rem 0.9rem',
+                        fontSize: 13,
+                        color: '#854d0e',
+                      }}
+                    >
+                      🔎 El Proveedor hará primero un diagnóstico y luego definirá qué materiales
+                      comprar. La Lista Proxi se generará después de la visita.
+                    </div>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card title="Fotos opcionales">
             <CardContent>

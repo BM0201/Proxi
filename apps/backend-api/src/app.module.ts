@@ -20,6 +20,10 @@ import { ChatModule } from './modules/chat/chat.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ReputationModule } from './modules/reputation/reputation.module';
 import { QuickTasksModule } from './modules/quick-tasks/quick-tasks.module';
+import { ToolsModule } from './modules/tools/tools.module';
+import { MaterialsModule } from './modules/materials/materials.module';
+import { PartnerStoresModule } from './modules/partner-stores/partner-stores.module';
+import { PackagesModule } from './modules/packages/packages.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { MediaModule } from './modules/media/media.module';
@@ -46,6 +50,10 @@ import { LocationsModule } from './modules/locations/locations.module';
     PaymentsModule,
     ReputationModule,
     QuickTasksModule,
+    ToolsModule,
+    MaterialsModule,
+    PartnerStoresModule,
+    PackagesModule,
     SubscriptionsModule,
     DisputesModule,
     MediaModule,

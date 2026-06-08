@@ -135,3 +135,6 @@ export type PaginationDto = z.infer<typeof paginationSchema>;
 
 export * from './reputation.dto';
 export * from './quick-task.dto';
+export * from './tools.dto';
+export * from './materials.dto';
+export * from './stores.dto';

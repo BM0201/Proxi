@@ -57,6 +57,28 @@ export class CreateTaskDto {
   @IsNumber()
   @Min(1)
   estimatedDurationMinutes?: number;
+
+  /** Requerimiento de herramientas del Proveedor independiente para la Tarea. */
+  @IsOptional()
+  @IsIn(['CLIENT_PROVIDES_TOOLS', 'PROVIDER_BRINGS_TOOLS', 'NO_TOOLS_REQUIRED'])
+  toolRequirement?: 'CLIENT_PROVIDES_TOOLS' | 'PROVIDER_BRINGS_TOOLS' | 'NO_TOOLS_REQUIRED';
+
+  /**
+   * Responsabilidad de los materiales. Por regla de Proxi, el Proveedor NO
+   * compra materiales por defecto: el Cliente los compra (con Lista Proxi si aplica).
+   */
+  @IsOptional()
+  @IsIn([
+    'CLIENT_ALREADY_HAS_MATERIALS',
+    'CLIENT_NEEDS_PURCHASE_LIST',
+    'NEEDS_DIAGNOSIS_FIRST',
+    'NO_MATERIALS_REQUIRED',
+  ])
+  materialResponsibility?:
+    | 'CLIENT_ALREADY_HAS_MATERIALS'
+    | 'CLIENT_NEEDS_PURCHASE_LIST'
+    | 'NEEDS_DIAGNOSIS_FIRST'
+    | 'NO_MATERIALS_REQUIRED';
 }
 
 export class UpdateTaskDto {

@@ -36,9 +36,14 @@ export default function ProveedorTaskDetailPage() {
         title={task.title}
         description="Detalle real de tarea disponible. Solo se muestra zona aproximada."
         actions={
-          <Link href={`/offers/new?taskId=${task.id}`} style={{ textDecoration: 'none' }}>
-            <Button>Enviar oferta</Button>
-          </Link>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href={`/tasks/${task.id}/materials/create`} style={{ textDecoration: 'none' }}>
+              <Button variant="secondary">Lista Proxi de materiales</Button>
+            </Link>
+            <Link href={`/offers/new?taskId=${task.id}`} style={{ textDecoration: 'none' }}>
+              <Button>Enviar oferta</Button>
+            </Link>
+          </div>
         }
       />
 
